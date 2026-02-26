@@ -1,7 +1,5 @@
 // src/components/CreateJobForm.tsx — 建立任務表單（單一職責：表單欄位與驗證）
 import { useState } from 'react';
-import { ALGO_OPTIONS } from '../constants/algorithms';
-import { JOB_TYPE_OPTIONS } from '../constants/jobTypes';
 import type { CreateJobPayload } from '../types/job';
 
 interface Props {
@@ -12,12 +10,8 @@ interface Props {
 
 export default function CreateJobForm({ onSubmit, isSubmitting, error }: Props) {
   const [title, setTitle] = useState('');
-  const [jobType, setJobType] = useState(JOB_TYPE_OPTIONS[0].value);
-  const [algorithm, setAlgorithm] = useState(ALGO_OPTIONS[0].value);
   const [paramN, setParamN] = useState('10');
-  const [gpus, setGpus] = useState(1);
-
-  const GPU_OPTIONS = [1, 2, 4, 8] as const;
+  const [cores, setCores] = useState('100');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +19,9 @@ export default function CreateJobForm({ onSubmit, isSubmitting, error }: Props) 
 
     onSubmit({
       title: title.trim(),
-      job_type: jobType,
-      algorithm,
-      params: { N: Number(paramN) || 10, GPUs: gpus },
+      job_type: '',
+      algorithm: '',
+      params: { N: Number(paramN) || 10, cores: Number(cores) || 100 },
     });
   };
 
@@ -51,44 +45,6 @@ export default function CreateJobForm({ onSubmit, isSubmitting, error }: Props) 
         />
       </fieldset>
 
-      {/* 問題類型 */}
-      <fieldset className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">問題類型</label>
-        <div className="grid grid-cols-3 gap-2">
-          {JOB_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setJobType(opt.value)}
-              className={`rounded-lg px-3 py-2 text-sm border transition-all
-                ${jobType === opt.value
-                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
-                  : 'bg-gray-800/40 border-gray-700/40 text-gray-400 hover:border-gray-600/60 hover:text-gray-300'
-                }`}
-            >
-              <div className="font-medium">{opt.label}</div>
-              <div className="text-[10px] mt-0.5 opacity-70">{opt.description}</div>
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      {/* 演算法 */}
-      <fieldset className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">演算法</label>
-        <select
-          value={algorithm}
-          onChange={(e) => setAlgorithm(e.target.value)}
-          className="bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2.5 text-sm text-gray-100
-                     focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60
-                     transition-colors cursor-pointer"
-        >
-          {ALGO_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </fieldset>
-
       {/* 參數 N */}
       <fieldset className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">參數 N</label>
@@ -103,25 +59,24 @@ export default function CreateJobForm({ onSubmit, isSubmitting, error }: Props) 
         />
       </fieldset>
 
-      {/* GPU 數量 */}
+      {/* 核心數量 */}
       <fieldset className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">GPU 數量</label>
-        <div className="grid grid-cols-4 gap-2">
-          {GPU_OPTIONS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setGpus(n)}
-              className={`rounded-lg px-3 py-2 text-sm border transition-all
-                ${gpus === n
-                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
-                  : 'bg-gray-800/40 border-gray-700/40 text-gray-400 hover:border-gray-600/60 hover:text-gray-300'
-                }`}
-            >
-              {n} GPU
-            </button>
-          ))}
-        </div>
+        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+          核心數量 <span className="text-gray-500 normal-case font-normal">(最低 100)</span>
+        </label>
+        <input
+          type="number"
+          min={100}
+          step={1}
+          value={cores}
+          onChange={(e) => setCores(e.target.value)}
+          className="bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2.5 text-sm text-gray-100
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60
+                     transition-colors"
+        />
+        {Number(cores) < 100 && cores !== '' && (
+          <span className="text-rose-400 text-xs">核心數量不可低於 100</span>
+        )}
       </fieldset>
 
       {/* Error */}
@@ -134,7 +89,7 @@ export default function CreateJobForm({ onSubmit, isSubmitting, error }: Props) 
       {/* Submit */}
       <button
         type="submit"
-        disabled={isSubmitting || !title.trim()}
+        disabled={isSubmitting || !title.trim() || Number(cores) < 100}
         className="mt-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
                    bg-indigo-600 hover:bg-indigo-500 text-white
                    disabled:opacity-40 disabled:cursor-not-allowed

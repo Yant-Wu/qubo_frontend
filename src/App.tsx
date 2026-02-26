@@ -93,10 +93,8 @@ export default function OptimizationDashboard() {
         isLoading={isListLoading}
         error={listError}
         activeId={activeId}
-        selectedAlgo={selectedAlgo}
         onSelectJob={handleSelectJob}
         onDeleteJob={handleDeleteJob}
-        onChangeAlgo={setSelectedAlgo}
         onCreateNew={handleOpenCreate}
       />
 

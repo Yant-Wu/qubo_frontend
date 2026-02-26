@@ -1,6 +1,5 @@
 // src/components/Sidebar.tsx — 可收合漢堡菜單側邊欄（單一職責：組合 header + 列表佈局）
 import { Cpu, Plus, X } from 'lucide-react';
-import AlgorithmSelector from './AlgorithmSelector';
 import JobListItem from './JobListItem';
 import type { JobItem } from '../types/job';
 
@@ -11,10 +10,8 @@ interface Props {
   isLoading: boolean;
   error: string | null;
   activeId: string | number | null;
-  selectedAlgo: string;
   onSelectJob: (id: string | number) => void;
   onDeleteJob: (id: string | number) => void;
-  onChangeAlgo: (algo: string) => void;
   onCreateNew: () => void;
 }
 
@@ -25,10 +22,8 @@ export default function Sidebar({
   isLoading,
   error,
   activeId,
-  selectedAlgo,
   onSelectJob,
   onDeleteJob,
-  onChangeAlgo,
   onCreateNew,
 }: Props) {
   return (
@@ -65,8 +60,6 @@ export default function Sidebar({
               <X size={18} />
             </button>
           </div>
-          <AlgorithmSelector value={selectedAlgo} onChange={onChangeAlgo} />
-
           <button
             onClick={onCreateNew}
             className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium

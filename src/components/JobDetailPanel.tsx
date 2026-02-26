@@ -1,5 +1,5 @@
 // src/components/JobDetailPanel.tsx — 任務詳情面板（單一職責：任務詳情的佈局與狀態切換）
-import { Hash, Layers, Activity, Cpu, RefreshCw } from 'lucide-react';
+import { Hash, Activity, Cpu, RefreshCw } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import InfoCard from './InfoCard';
 import ConvergenceChart from './ConvergenceChart';
@@ -49,7 +49,7 @@ export default function JobDetailPanel({ detail, isLoading, error, onRefetch }: 
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 rounded-2xl bg-gray-800/60 flex items-center justify-center mx-auto mb-4">
-            <Layers size={28} className="text-gray-600" />
+            <Cpu size={28} className="text-gray-600" />
           </div>
           <div className="text-gray-500 text-sm">請從左側選擇一個任務</div>
         </div>
@@ -78,10 +78,9 @@ export default function JobDetailPanel({ detail, isLoading, error, onRefetch }: 
       </div>
 
       {/* Info cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <InfoCard icon={Layers} label="問題類型" value={detail.job_type || '-'} />
+      <div className="grid grid-cols-3 gap-3">
         <InfoCard icon={Hash} label="參數 N" value={detail.params?.N ?? '-'} />
-        <InfoCard icon={Cpu} label="GPU 數量" value={detail.params?.GPUs ?? '-'} />
+        <InfoCard icon={Cpu} label="核心數量" value={detail.params?.cores ?? '-'} />
         <InfoCard icon={Activity} label="迭代次數" value={detail.history_data?.length || 0} />
       </div>
 

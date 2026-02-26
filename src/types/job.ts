@@ -11,6 +11,7 @@ export interface JobItem {
 /** 任務參數 */
 export interface JobParams {
   N: number | string;
+  cores?: number | string;
   [key: string]: unknown; // 允許額外參數
 }
 
