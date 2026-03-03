@@ -1,0 +1,265 @@
+// src/components/QuboMonitorPanel.tsx — 監控儀錶板：歷史任務狀態跟蹤
+import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { Play } from 'lucide-react';
+import type { JobDetail, SimParams } from '../types/job';
+import { useQuboSimulation } from '../hooks/useQuboSimulation';
+import EnergyConvergenceChart from './EnergyConvergenceChart';
+import EntropyChart from './EntropyChart';
+import QMatrixHeatmap from './QMatrixHeatmap';
+
+type ChartTab = 'convergence' | 'entropy' | 'heatmap';
+
+interface Props {
+  jobId: string | number | null;
+  detail: JobDetail | null;
+  isLoading?: boolean;
+  loadError?: string | null;
+  simParams?: SimParams;
+  onStop: () => void;
+  onReuseSettings?: () => void;
+}
+
+// ── 閃爍數傀元件 ─────────────────────────────────────────────────
+function FlickerValue({ value, large = false }: { value: string; large?: boolean }) {
+  const [flash, setFlash] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (value !== prev.current) {
+      prev.current = value;
+      if (value !== '—') {
+        setFlash(true);
+        const t = setTimeout(() => setFlash(false), 350);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [value]);
+  return (
+    <span
+      className={[
+        'font-mono transition-all duration-150 leading-none',
+        large ? 'text-2xl font-bold' : 'text-base font-semibold',
+        flash ? 'text-white drop-shadow-[0_0_8px_rgba(110,231,183,0.9)]' : 'text-emerald-300',
+      ].join(' ')}
+    >
+      {value}
+    </span>
+  );
+}
+
+// ── 主元件 ──────────────────────────────────────────────────────────
+export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, onStop, onReuseSettings }: Props) {
+  const {
+    paramPenalty, paramNumReads, paramInitTemp, paramCoolingRate,
+    simHistory,
+    isRunning, isCompleted,
+    handlePause,
+    numReads, iterCount, progress,
+    bestObjective, tts, feasiblePct,
+  } = useQuboSimulation(jobId, detail, simParams);
+
+  const [activeTab, setActiveTab] = useState<ChartTab>('convergence');
+
+  // ── 載入中 / 錯誤狀態（優先顯示，避免黑屏） ───────────────────
+  if (isLoading && detail === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-950">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" />
+          <p className="text-gray-400 text-sm">載入任務資料中…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError && detail === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-950">
+        <div className="text-center space-y-3 max-w-sm px-6">
+          <p className="text-rose-400 text-sm font-semibold">無法載入任務</p>
+          <p className="text-gray-500 text-xs">{loadError}</p>
+          <button
+            onClick={onStop}
+            className="mt-2 text-xs text-gray-500 hover:text-gray-300 underline transition-colors"
+          >
+            ← 返回首頁
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Status ──────────────────────────────────────────────────────
+  const backendStatus = detail?.status;
+  const statusLabel = backendStatus ?? (isRunning ? 'running' : isCompleted ? 'completed' : 'idle');
+  const statusColor = statusLabel === 'running'
+    ? 'bg-emerald-900/40 text-emerald-400'
+    : statusLabel === 'completed'
+    ? 'bg-indigo-900/40 text-indigo-300'
+    : 'bg-gray-800/60 text-gray-500';
+  const dotColor = statusLabel === 'running'
+    ? 'bg-emerald-400 animate-pulse'
+    : statusLabel === 'completed'
+    ? 'bg-indigo-400'
+    : 'bg-gray-600';
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ── 主體：左側 + 右側圖表 ──────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden">
+
+        {/* ── 左側面板 ─────────────────────────────────────────────── */}
+        <aside className="w-60 flex-shrink-0 flex flex-col gap-3 p-4 border-r border-gray-800/60 bg-gray-900/40 overflow-y-auto">
+
+          {/* 求解參數（只讀） */}
+          <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-1.5">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              求解參數
+            </p>
+            <ReadRow label="Variables"    value={String(detail?.n_variables ?? '—')} />
+            <ReadRow label="Penalty"      value={paramPenalty} />
+            <ReadRow label="Num Reads"    value={paramNumReads} />
+            <ReadRow label="Neighbors (N)" value={paramInitTemp} />
+            <ReadRow label="Iterations"    value={paramCoolingRate} />
+          </div>
+
+          {/* 最佳化指標（大字 + 閃爍） */}
+          <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-4">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              最佳化結果
+            </p>
+            <MetricBlock label="Best Objective">
+              <FlickerValue value={bestObjective} large />
+            </MetricBlock>
+            <MetricBlock label="TTS">
+              <FlickerValue value={tts} large />
+            </MetricBlock>
+            <MetricBlock label="Feasible Solutions">
+              <FlickerValue value={feasiblePct !== '—' ? `${feasiblePct} %` : '—'} large />
+            </MetricBlock>
+          </div>
+
+          <div className="flex-1" />
+
+          {statusLabel === 'running' && (
+            <div className="text-center text-[11px] text-emerald-300 font-medium py-1">後端運算中…</div>
+          )}
+          {statusLabel === 'completed' && (
+            <div className="text-center text-[11px] text-indigo-300 font-medium py-1">✓ 後端回傳完成</div>
+          )}
+          {statusLabel !== 'running' && statusLabel !== 'completed' && (
+            <div className="text-center text-[11px] text-gray-500 font-medium py-1">等待後端排程</div>
+          )}
+
+          {/* 套用此設定重新執行 */}
+          {onReuseSettings && (
+            <button
+              onClick={onReuseSettings}
+              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors border border-indigo-700/40">
+              ↺ 套用此設定重新執行
+            </button>
+          )}
+          <button
+            onClick={() => { handlePause(); onStop(); }}
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-gray-500 hover:text-rose-400 text-xs transition-colors">
+            ← 離開並刪除任務
+          </button>
+        </aside>
+
+        {/* ── 右側：圖表區 ───────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col overflow-hidden p-4 gap-3">
+          {/* 頂部標題列 */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm font-semibold text-gray-200">收斂監控</span>
+            {detail?.task_name && (
+              <span className="text-xs text-gray-500 truncate">— {detail.task_name}</span>
+            )}
+            <span className={`ml-auto flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full ${statusColor}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+              {statusLabel}
+            </span>
+          </div>
+
+          {/* Tab 切換按鈕 */}
+          <div className="flex gap-1 flex-shrink-0">
+            {(['convergence', 'entropy', 'heatmap'] as ChartTab[]).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'bg-indigo-600 text-white shadow shadow-indigo-900/40'
+                    : 'bg-gray-800/60 text-gray-400 hover:text-gray-200 hover:bg-gray-700/60'
+                }`}>
+                {tab === 'convergence' ? 'Objective Chart'
+                  : tab === 'entropy' ? 'Entropy Chart'
+                  : 'Q Matrix Heatmap'}
+              </button>
+            ))}
+          </div>
+
+          {/* 主圖表 */}
+          {!isRunning && !isCompleted && iterCount === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto">
+                  <Play size={28} className="text-indigo-400 ml-1" />
+                </div>
+                <div>
+                  <p className="text-gray-300 text-sm font-medium">等待資料</p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    {detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 bg-gray-800/30 border border-gray-700/40 rounded-xl overflow-hidden min-h-0">
+              {activeTab === 'convergence' ? (
+                <EnergyConvergenceChart history={simHistory} />
+              ) : activeTab === 'entropy' ? (
+                <EntropyChart history={simHistory} />
+              ) : (
+                <QMatrixHeatmap
+                  n={detail?.n_variables ?? 8}
+                  seed={typeof jobId === 'number' ? jobId : Number(jobId) || 0}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 全寬進度條（底部） ─────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-5 py-3 border-t border-gray-800/60 bg-gray-900/60">
+        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
+          <span className="font-medium">進度</span>
+          <span className="font-mono">{iterCount} / {numReads}</span>
+        </div>
+        <div className="h-2.5 rounded-full bg-gray-800 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-150"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 只讀參數列 ─────────────────────────────────────────────────────
+function ReadRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-gray-500">{label}</span>
+      <span className="text-[11px] font-mono text-indigo-300">{value}</span>
+    </div>
+  );
+}
+
+// ── 大字指標區塊 ───────────────────────────────────────────────────
+function MetricBlock({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</span>
+      {children}
+    </div>
+  );
+}
