@@ -11,10 +11,20 @@ const fallback = { label: '未知', bg: 'bg-gray-500/15', text: 'text-gray-400',
 
 interface Props {
   status: string;
+  dotOnly?: boolean;
 }
 
-export default function StatusBadge({ status }: Props) {
+export default function StatusBadge({ status, dotOnly = false }: Props) {
   const cfg = statusConfig[status] ?? fallback;
+
+  if (dotOnly) {
+    return (
+      <span
+        title={cfg.label}
+        className={`inline-block w-2 h-2 rounded-full ${cfg.dot} ${status === 'running' ? 'animate-pulse' : ''}`}
+      />
+    );
+  }
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>

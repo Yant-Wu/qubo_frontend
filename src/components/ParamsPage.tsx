@@ -1,0 +1,229 @@
+// src/components/ParamsPage.tsx — 第一頁：基本資訊 + 求解參數設定
+import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+import type { CreateJobPayload, SimParams } from '../types/job';
+import { useCreateJobForm, PROBLEM_TYPES, SOLVER_BACKENDS } from '../hooks/useCreateJobForm';
+
+interface Props {
+  onNext: (payload: CreateJobPayload, simParams: SimParams) => void;
+  defaultSimParams?: SimParams;
+  defaultPayload?: Partial<CreateJobPayload>;  // 重用舊任務（加 copy 後綴）
+  restorePayload?: Partial<CreateJobPayload>;  // 上一步返回時原樣還原
+}
+
+export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, restorePayload }: Props) {
+  // restorePayload 優先（原樣還原），其次 defaultPayload（複製加 copy 後綴）
+  const initPayload = restorePayload ?? defaultPayload;
+  const copySuffix  = !restorePayload && !!defaultPayload;
+
+  const {
+    taskName, setTaskName,
+    problemType, setProblemType,
+    genMethod, setGenMethod,
+    nVariables, setNVariables,
+    seed, setSeed,
+    solver, setSolver,
+    coreLimit, setCoreLimit,
+    qpuQuota, setQpuQuota,
+    selectedSolver, coreValid, canSubmit, buildPayload,
+  } = useCreateJobForm(initPayload ? {
+    taskName:    initPayload.task_name    ? initPayload.task_name + (copySuffix ? ' (copy)' : '') : undefined,
+    problemType: initPayload.problem_type,
+    genMethod:   initPayload.problem_data?.generation_method,
+    nVariables:  initPayload.n_variables  ? String(initPayload.n_variables) : undefined,
+    seed:        initPayload.problem_data?.seed != null ? String(initPayload.problem_data.seed) : undefined,
+    solver:      initPayload.solver_backend,
+    coreLimit:   initPayload.core_limit   ? String(initPayload.core_limit) : undefined,
+  } : undefined);
+
+  const isAEQTS = true; // 所有後端均使用 AEQTS 求解器
+
+  const [penalty,     setPenalty]     = useState(defaultSimParams?.penalty     ?? '1');
+  const [numReads,    setNumReads]    = useState(defaultSimParams?.numReads    ?? '1000');
+  const [initTemp,    setInitTemp]    = useState(defaultSimParams?.initTemp    ?? '50');
+  const [coolingRate, setCoolingRate] = useState(defaultSimParams?.coolingRate ?? '1000');
+
+  const handleNext = () => {
+    if (!canSubmit(false)) return;
+    const payload = buildPayload();
+    // 將 AEQTS 參數實際送入 payload
+    payload.core_limit = Math.max(1, Number(initTemp) || 50);       // Neighbors (N)
+    payload.problem_data = {
+      ...payload.problem_data,
+      num_iterations: Math.max(100, Number(coolingRate) || 1000),    // Iterations
+      num_runs:       Math.max(1,   Number(numReads)    || 1),       // Num Reads
+    };
+    onNext(payload, { penalty, numReads, initTemp, coolingRate });
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="flex items-center justify-center p-6 min-h-screen">
+        <div className="w-full max-w-5xl bg-gray-900 border border-gray-700/50 rounded-2xl shadow-2xl shadow-black/50 p-8">
+          
+          <div className="grid grid-cols-2 gap-8">
+            {/* ── 左欄：基本設定 + 求解器 ───────────────────────────────── */}
+            <div className="space-y-5">
+              <SectionTitle>基本設定</SectionTitle>
+              
+              <CompactField label="任務標題" required>
+                <input
+                  type="text"
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  placeholder="e.g. TSP benchmark"
+                  className={compactInputCls}
+                />
+              </CompactField>
+
+              <CompactField label="問題類型" required>
+                <select
+                  value={problemType}
+                  onChange={(e) => setProblemType(e.target.value)}
+                  className={compactInputCls}
+                >
+                  {PROBLEM_TYPES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </CompactField>
+
+              <CompactField label="資料集">
+                <div className="flex gap-3 text-sm mb-2">
+                  {(['random', 'upload'] as const).map((m) => (
+                    <label key={m} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio" name="genMethod" value={m}
+                        checked={genMethod === m}
+                        onChange={() => setGenMethod(m)}
+                        className="accent-indigo-500 w-4 h-4"
+                      />
+                      <span className="text-gray-300">
+                        {m === 'random' ? '隨機' : '上傳'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {genMethod === 'random' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="number" min={1} value={nVariables}
+                      onChange={(e) => setNVariables(e.target.value)}
+                      placeholder="變數數 (N)"
+                      className={compactInputCls} />
+                    <input type="number" min={0} value={seed}
+                      onChange={(e) => setSeed(e.target.value)}
+                      placeholder="種子"
+                      className={compactInputCls} />
+                  </div>
+                ) : (
+                  <div className="text-center py-4 rounded-lg border border-dashed border-gray-700/60 text-gray-600 text-sm">
+                    (開發中)
+                  </div>
+                )}
+              </CompactField>
+
+              <div className="pt-2">
+                <SectionTitle>求解器</SectionTitle>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {SOLVER_BACKENDS.map((s) => (
+                    <label key={s.value}
+                      className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-800/30 transition-colors">
+                      <input type="radio" name="solver" value={s.value}
+                        checked={solver === s.value} onChange={() => setSolver(s.value)}
+                        className="accent-indigo-500 w-4 h-4" />
+                      <span className="text-sm text-gray-300">{s.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {selectedSolver.showCores && (
+                <CompactField label="核心數量" hint="≥100">
+                  <input type="number" min={100} step={1} value={coreLimit}
+                    onChange={(e) => setCoreLimit(e.target.value)} className={compactInputCls} />
+                  {!coreValid && coreLimit !== '' && (
+                    <span className="text-rose-400 text-xs">需 ≥ 100</span>
+                  )}
+                </CompactField>
+              )}
+
+              {selectedSolver.showQPU && (
+                <CompactField label="QPU 配額">
+                  <input type="number" min={1} value={qpuQuota}
+                    onChange={(e) => setQpuQuota(e.target.value)} className={compactInputCls} />
+                </CompactField>
+              )}
+            </div>
+
+            {/* ── 右欄：相關參數 ───────────────────────────────────────── */}
+            <div className="space-y-5">
+              <SectionTitle>相關參數</SectionTitle>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <CompactField label="Penalty">
+                  <input type="number" min={0.01} step={0.01} value={penalty}
+                    onChange={(e) => setPenalty(e.target.value)} className={compactInputCls} />
+                </CompactField>
+                <CompactField label="Num Reads">
+                  <input type="number" min={1} step={1} value={numReads}
+                    onChange={(e) => setNumReads(e.target.value)} className={compactInputCls} />
+                </CompactField>
+              </div>
+
+              {isAEQTS && (
+                <>
+                  <SectionTitle>AEQTS 參數</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CompactField label="Neighbors (N)" hint="鄰域大小">
+                      <input type="number" min={1} step={1} value={initTemp}
+                        onChange={(e) => setInitTemp(e.target.value)} className={compactInputCls} />
+                    </CompactField>
+                    <CompactField label="Iterations" hint="迭代次數">
+                      <input type="number" min={100} step={100} value={coolingRate}
+                        onChange={(e) => setCoolingRate(e.target.value)} className={compactInputCls} />
+                    </CompactField>
+                  </div>
+                </>
+              )}
+
+              {/* 下一步按鈕 */}
+              <button
+                onClick={handleNext}
+                disabled={!canSubmit(false)}
+                className="w-full mt-8 flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-indigo-900/30"
+              >
+                下一步：QUBO 設定
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 小元件 ────────────────────────────────────────────────────────
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{children}</h3>;
+}
+
+function CompactField({ label, required, hint, children }: {
+  label: string; required?: boolean; hint?: string; children: React.ReactNode;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-1.5">
+        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+          {label}{required && <span className="text-rose-400">*</span>}
+        </label>
+        {hint && <span className="text-[10px] text-gray-600 font-normal">({hint})</span>}
+      </div>
+      {children}
+    </fieldset>
+  );
+}
+
+const compactInputCls =
+  'bg-gray-800/60 border border-gray-700/50 rounded-lg px-3.5 py-2 text-sm text-gray-100 w-full ' +
+  'placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition-colors';

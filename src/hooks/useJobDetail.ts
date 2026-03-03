@@ -7,12 +7,12 @@ interface UseJobDetailReturn {
   detail: JobDetail | null;
   isLoading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useJobDetail(activeId: string | number | null): UseJobDetailReturn {
   const [detail, setDetail] = useState<JobDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(activeId != null); // 有 id 時初始就是載入中
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -38,6 +38,15 @@ export function useJobDetail(activeId: string | number | null): UseJobDetailRetu
   useEffect(() => {
     load();
   }, [load]);
+
+  // 正式環境：輪詢後端狀態與歷史資料
+  useEffect(() => {
+    if (activeId == null) return;
+    const timer = setInterval(() => {
+      void load();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [activeId, load]);
 
   return { detail, isLoading, error, refetch: load };
 }

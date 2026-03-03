@@ -27,7 +27,7 @@ export default function JobListItem({ item, isActive, onSelect, onDelete }: Prop
     >
       <div className="flex items-center justify-between">
         <div className={`text-sm font-medium truncate flex-1 ${isActive ? 'text-indigo-300' : 'text-gray-300 group-hover:text-white'}`}>
-          {item.title}
+          {item.task_name}
         </div>
         <div
           role="button"

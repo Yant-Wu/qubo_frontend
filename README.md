@@ -71,3 +71,33 @@ export default defineConfig([
   },
 ])
 ```
+
+## Production checklist (real database)
+
+### 1) Frontend must point to real backend
+
+- Copy `.env.example` to `.env.production`
+- Set `VITE_API_BASE` to your production API domain
+- Build with `npm run build`
+
+### 2) Backend API (required for DB-based status)
+
+- `GET /api/jobs` (list from DB)
+- `POST /api/jobs` (create row in DB)
+- `GET /api/jobs/{id}` (detail from DB)
+- `DELETE /api/jobs/{id}` (delete row in DB)
+- `PATCH /api/jobs/{id}/status` (update `pending|running|completed|failed`)
+- `POST /api/jobs/{id}/history` (append convergence points)
+
+### 3) Data consistency rules
+
+- Sidebar status uses backend `status` only
+- History chart data should come from backend `history_data`
+- Avoid using browser-only state as source of truth in production
+
+### 4) Pre-release smoke test
+
+- Create a job from UI and confirm DB row exists
+- Verify status transition `pending -> running -> completed` in DB
+- Refresh browser and confirm same status/history is displayed
+- Delete a job and confirm DB row is removed
