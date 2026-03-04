@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { CreateJobPayload, SimParams } from '../types/job';
-import { useCreateJobForm, PROBLEM_TYPES, SOLVER_BACKENDS } from '../hooks/useCreateJobForm';
+import { useCreateJobForm, PROBLEM_TYPES } from '../hooks/useCreateJobForm';
 
 interface Props {
   onNext: (payload: CreateJobPayload, simParams: SimParams) => void;
@@ -22,18 +22,13 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
     genMethod, setGenMethod,
     nVariables, setNVariables,
     seed, setSeed,
-    solver, setSolver,
-    coreLimit, setCoreLimit,
-    qpuQuota, setQpuQuota,
-    selectedSolver, coreValid, canSubmit, buildPayload,
+    canSubmit, buildPayload,
   } = useCreateJobForm(initPayload ? {
     taskName:    initPayload.task_name    ? initPayload.task_name + (copySuffix ? ' (copy)' : '') : undefined,
     problemType: initPayload.problem_type,
     genMethod:   initPayload.problem_data?.generation_method,
     nVariables:  initPayload.n_variables  ? String(initPayload.n_variables) : undefined,
     seed:        initPayload.problem_data?.seed != null ? String(initPayload.problem_data.seed) : undefined,
-    solver:      initPayload.solver_backend,
-    coreLimit:   initPayload.core_limit   ? String(initPayload.core_limit) : undefined,
   } : undefined);
 
   const isAEQTS = true; // 所有後端均使用 AEQTS 求解器
@@ -120,38 +115,6 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
                   </div>
                 )}
               </CompactField>
-
-              <div className="pt-2">
-                <SectionTitle>求解器</SectionTitle>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  {SOLVER_BACKENDS.map((s) => (
-                    <label key={s.value}
-                      className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-800/30 transition-colors">
-                      <input type="radio" name="solver" value={s.value}
-                        checked={solver === s.value} onChange={() => setSolver(s.value)}
-                        className="accent-indigo-500 w-4 h-4" />
-                      <span className="text-sm text-gray-300">{s.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {selectedSolver.showCores && (
-                <CompactField label="核心數量" hint="≥100">
-                  <input type="number" min={100} step={1} value={coreLimit}
-                    onChange={(e) => setCoreLimit(e.target.value)} className={compactInputCls} />
-                  {!coreValid && coreLimit !== '' && (
-                    <span className="text-rose-400 text-xs">需 ≥ 100</span>
-                  )}
-                </CompactField>
-              )}
-
-              {selectedSolver.showQPU && (
-                <CompactField label="QPU 配額">
-                  <input type="number" min={1} value={qpuQuota}
-                    onChange={(e) => setQpuQuota(e.target.value)} className={compactInputCls} />
-                </CompactField>
-              )}
             </div>
 
             {/* ── 右欄：相關參數 ───────────────────────────────────────── */}
