@@ -59,6 +59,7 @@ export interface CreateJobPayload {
     filename?: string;
     num_iterations?: number;   // AEQTS 迭代次數
     timeout_seconds?: number;  // 執行時限（秒）
+    Q_matrix?: number[][];     // 自訂 QUBO 矩陣（custom 類型）
   };
 }
 

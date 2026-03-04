@@ -51,6 +51,21 @@ export default function OptimizationDashboard() {
   // ── Page 2 → Page 1 ─────────────────────────────────────────────
   const handleQuboBack = () => setViewMode('params');
 
+  // ── Page 2 提交（Custom QUBO：直接建立 Job，不過 /solve）───────
+  const handleCustomQuboSubmit = (qMatrix: number[][]) => {
+    if (pendingPayload) {
+      const updatedPayload = {
+        ...pendingPayload,
+        n_variables: qMatrix.length,
+        problem_data: { ...pendingPayload.problem_data, Q_matrix: qMatrix },
+      };
+      createJob(updatedPayload)
+        .then((job) => { setActiveId(job.id); return refetchList(); })
+        .catch((err) => console.error('建立自訂 QUBO 任務失敗:', err));
+    }
+    setViewMode('dashboard');
+  };
+
   // ── Page 2 提交（POST /solve）—————————————————————————
   const handleQuboSubmit = async (payload: KnapsackSolveRequest) => {
     // 1. 即時求解（POST /solve）
@@ -194,6 +209,7 @@ export default function OptimizationDashboard() {
               result={solveResult}
               onBack={handleQuboBack}
               onSubmit={handleQuboSubmit}
+              onSubmitCustom={handleCustomQuboSubmit}
               initialFormData={quboFormData}
               onFormChange={setQuboFormData}
             />
