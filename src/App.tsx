@@ -72,9 +72,18 @@ export default function OptimizationDashboard() {
     const result = await solve(payload);
     if (result === null) return;
 
-    // 2. 背量建立 Job（不阻塞 UI）
+    // 2. 背量建立 Job（不阻塞 UI），同時把表單值存入 problem_data 供日後還原
     if (pendingPayload) {
-      createJob(pendingPayload)
+      const enrichedPayload: CreateJobPayload = {
+        ...pendingPayload,
+        problem_data: {
+          ...pendingPayload.problem_data,
+          items:    payload.items,
+          capacity: payload.capacity,
+          penalty:  payload.penalty,
+        },
+      };
+      createJob(enrichedPayload)
         .then((job) => { setActiveId(job.id); return refetchList(); })
         .catch((err) => console.error('建立歷史任務失敗:', err));
     }
@@ -121,6 +130,20 @@ export default function OptimizationDashboard() {
       initTemp:    String(Math.round(jobDetail.t_start ?? 50)),
       coolingRate: String(Math.round(jobDetail.t_end   ?? 1000)),
     });
+    // 還原 QuboSetupPage 的 Knapsack 表單
+    const pd = jobDetail.problem_data;
+    if (pd?.items && pd.items.length > 0) {
+      setQuboFormData({
+        items: pd.items.map(item => ({
+          name:   item.name,
+          weight: String(item.weight),
+          value:  String(item.value),
+        })),
+        capacity:      String(pd.capacity ?? 10),
+        penalty:       String(pd.penalty  ?? 0),
+        penaltyTouched: pd.penalty != null,
+      });
+    }
     resetSolveState();
     setPendingPayload(null);
     setViewMode('params');

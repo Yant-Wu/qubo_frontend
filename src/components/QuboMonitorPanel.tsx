@@ -113,8 +113,25 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
           {/* 求解參數（只讀） */}
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-1.5">
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              求解參數
+              此次參數紀錄
             </p>
+            {/* ── 任務基本資訊 ── */}
+            <ReadRow label="Task Name"     value={detail?.task_name ?? '—'} />
+            <ReadRow label="Problem Type"  value={detail?.problem_type ?? '—'} />
+            <ReadRow
+              label="Generation"
+              value={
+                detail?.problem_type === 'custom'
+                  ? `custom (${detail?.n_variables ?? '?'}×${detail?.n_variables ?? '?'})`
+                  : (detail?.problem_data?.generation_method ?? '—')
+              }
+            />
+            {detail?.problem_data?.generation_method === 'random' && detail?.problem_data?.seed !== undefined && (
+              <ReadRow label="Seed" value={String(detail.problem_data.seed)} />
+            )}
+            {/* ── 分隔線 ── */}
+            <div className="border-t border-gray-700/40 my-1" />
+            {/* ── 求解參數 ── */}
             <ReadRow label="Variables"     value={String(detail?.n_variables ?? '—')} />
             <ReadRow label="Timeout"       value={paramTimeout ? `${paramTimeout} s` : '—'} />
             <ReadRow label="Neighbors (N)" value={paramInitTemp} />

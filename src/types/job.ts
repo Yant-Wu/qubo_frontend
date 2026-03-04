@@ -22,6 +22,11 @@ export interface JobDetail {
     seed?: number;
     filename?: string;
     timeout_seconds?: number;
+    Q_matrix?: number[][];     // custom 類型的 QUBO 矩陣
+    // Knapsack 表單紀錄
+    items?: Array<{ name: string; weight: number; value: number }>;
+    capacity?: number;
+    penalty?: number;
   };
   history_data: HistoryDataPoint[];
   computation_time_ms?: number;  // 實際計算時間 (ms)
@@ -60,6 +65,10 @@ export interface CreateJobPayload {
     num_iterations?: number;   // AEQTS 迭代次數
     timeout_seconds?: number;  // 執行時限（秒）
     Q_matrix?: number[][];     // 自訂 QUBO 矩陣（custom 類型）
+    // Knapsack 表單紀錄
+    items?: Array<{ name: string; weight: number; value: number }>;
+    capacity?: number;
+    penalty?: number;
   };
 }
 
