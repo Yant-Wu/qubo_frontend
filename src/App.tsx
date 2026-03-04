@@ -206,7 +206,6 @@ export default function OptimizationDashboard() {
               problemData={pendingPayload?.problem_data}
               isSubmitting={isSubmitting}
               error={solveError}
-              result={solveResult}
               onBack={handleQuboBack}
               onSubmit={handleQuboSubmit}
               onSubmitCustom={handleCustomQuboSubmit}

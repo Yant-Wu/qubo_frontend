@@ -1,14 +1,13 @@
 // src/components/QuboSetupPage.tsx — 第二頁：QUBO / 背包問題求解設定
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Upload } from 'lucide-react';
-import type { KnapsackSolveRequest, KnapsackSolveResponse, QuboFormData } from '../types/job';
+import type { KnapsackSolveRequest, QuboFormData } from '../types/job';
 
 interface Props {
   problemType: string;
   problemData?: Record<string, unknown>;
   isSubmitting: boolean;
   error: string | null;
-  result: KnapsackSolveResponse | null;
   onBack: () => void;
   onSubmit: (data: KnapsackSolveRequest) => void;
   onSubmitCustom: (qMatrix: number[][]) => void;
@@ -19,7 +18,7 @@ interface Props {
 const PREVIEW_SIZE = 5;
 
 export default function QuboSetupPage({
-  problemType, problemData, isSubmitting, error, result,
+  problemType, problemData, isSubmitting, error,
   onBack, onSubmit, onSubmitCustom, initialFormData, onFormChange,
 }: Props) {
   const isCustom = problemType === 'custom';
@@ -167,7 +166,7 @@ export default function QuboSetupPage({
     <div className="flex-1 overflow-y-auto">
       <div className="flex items-center justify-center p-6 min-h-screen">
         <div className="w-full max-w-5xl bg-gray-900 border border-gray-700/50 rounded-2xl shadow-2xl shadow-black/50 p-8">
-          <div className="grid grid-cols-2 gap-8">
+          <div className={isCustom ? 'grid grid-cols-2 gap-8' : 'block'}>
 
             {/* ── LEFT PANEL ──────────────────────────────────── */}
             {isCustom ? (
@@ -304,40 +303,7 @@ export default function QuboSetupPage({
                     </div>
                   )}
                 </section>
-              ) : (
-                /* Knapsack solve result */
-                <section className="space-y-3">
-                  <SectionTitle>求解結果</SectionTitle>
-                  {!result ? (
-                    <div className="rounded-xl border border-gray-800/80 bg-gray-950/40 p-4 text-sm text-gray-500">
-                      尚未求解，請填入參數後按「開始求解」。
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Metric label="total_value" value={String(result.total_value)} />
-                        <Metric label="total_weight" value={String(result.total_weight)} />
-                        <Metric label="energy" value={String(result.energy)} />
-                        <Metric label="computation_time_ms" value={`${result.computation_time_ms} ms`} />
-                      </div>
-                      <div className="rounded-xl border border-gray-800/80 bg-gray-950/40 p-3">
-                        <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">selected items</p>
-                        {result.selected_items.length === 0 ? (
-                          <p className="text-sm text-gray-500">無被選中的物品</p>
-                        ) : (
-                          <ul className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                            {result.selected_items.map((item, index) => (
-                              <li key={`${item.name}-${index}`} className="text-sm text-gray-200">
-                                {item.name}（w: {item.weight}, v: {item.value}）
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
+              ) : (null)}
 
               {localWarning && (
                 <div className="text-amber-300 text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
@@ -388,15 +354,6 @@ export default function QuboSetupPage({
 // ── 小元件 ────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{children}</h3>;
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-gray-800/80 bg-gray-950/40 p-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
-      <p className="text-sm font-semibold text-gray-100 mt-1">{value}</p>
-    </div>
-  );
 }
 
 const inputCls =
