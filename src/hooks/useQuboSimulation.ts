@@ -8,10 +8,8 @@ type SimPoint = HistoryDataPoint;
 
 export interface UseQuboSimulationReturn {
   // 可編輯參數
-  paramPenalty: string;
-  setParamPenalty: (v: string) => void;
-  paramNumReads: string;
-  setParamNumReads: (v: string) => void;
+  paramTimeout: string;
+  setParamTimeout: (v: string) => void;
   paramInitTemp: string;
   setParamInitTemp: (v: string) => void;
   paramCoolingRate: string;
@@ -30,7 +28,7 @@ export interface UseQuboSimulationReturn {
   numReads: number;
   iterCount: number;
   progress: number;
-  lowestEnergy: string;
+
   bestObjective: string;
   tts: string;
   feasiblePct: string;
@@ -45,8 +43,7 @@ export function useQuboSimulation(
   const backendStatus = detail?.status ?? 'pending';
 
   // ── 可編輯參數 ─────────────────────────────────────────────────
-  const [paramPenalty, setParamPenalty] = useState<string>(externalSimParams?.penalty ?? String(detail?.core_limit ?? 1));
-  const [paramNumReads, setParamNumReads] = useState<string>(externalSimParams?.numReads ?? String(Math.max(backendHistory.length, 1000)));
+  const [paramTimeout, setParamTimeout] = useState<string>(externalSimParams?.timeout ?? '30');
   const [paramInitTemp, setParamInitTemp] = useState<string>(externalSimParams?.initTemp ?? '50');
   const [paramCoolingRate, setParamCoolingRate] = useState<string>(externalSimParams?.coolingRate ?? '1000');
 
@@ -57,8 +54,7 @@ export function useQuboSimulation(
 
   // ── jobId/detail 切換時改以後端資料為準 ───────────────────────
   useEffect(() => {
-    setParamPenalty(externalSimParams?.penalty ?? String(detail?.core_limit ?? 1));
-    setParamNumReads(externalSimParams?.numReads ?? String(Math.max((detail?.history_data?.length ?? 0), 1000)));
+    setParamTimeout(externalSimParams?.timeout ?? String(detail?.problem_data?.timeout_seconds ?? 30));
     // t_start 儲存 AEQTS 鄰域大小 N；t_end 儲存實際迭代次數
     const N       = detail?.t_start ?? 50;
     const numIter = detail?.t_end   ?? Math.max(1000, (detail?.n_variables ?? 0) * 100);
@@ -76,13 +72,11 @@ export function useQuboSimulation(
   const handlePause = useCallback(() => {}, []);
 
   // ── 衍生計算值 ─────────────────────────────────────────────────
-  const numReads = Math.max(1, parseInt(paramNumReads) || 1000);
-
   // 實際 AEQTS 迭代次數：優先使用後端記錄的 t_end（= num_iterations），否則推算
   const nVars = detail?.n_variables ?? 0;
   const totalIterations = detail?.t_end != null
     ? Math.round(detail.t_end)
-    : nVars > 0 ? Math.max(1000, nVars * 100) : numReads;
+    : nVars > 0 ? Math.max(1000, nVars * 100) : 1000;
 
   // 目前從後端收到的最後一個迭代編號（history 將 iteration 儲存在 d.iteration）
   const lastIteration = simHistory.length > 0
@@ -95,11 +89,6 @@ export function useQuboSimulation(
     : iterCount > 0
     ? Math.min(100, (iterCount / totalIterations) * 100)
     : 0;
-
-  const lowestEnergy =
-    iterCount > 0
-      ? Math.min(...simHistory.map((d) => d.value)).toFixed(6)
-      : '—';
 
   // 最佳目標値（越大越好，如背包總價値）
   const bestObjective =
@@ -122,14 +111,13 @@ export function useQuboSimulation(
   })();
 
   return {
-    paramPenalty, setParamPenalty,
-    paramNumReads, setParamNumReads,
+    paramTimeout, setParamTimeout,
     paramInitTemp, setParamInitTemp,
     paramCoolingRate, setParamCoolingRate,
     simHistory, isRunning, isCompleted,
     handleStart, handlePause,
-    numReads: totalIterations,  // 對外暴露的是實際總迭代次數
+    numReads: totalIterations,
     iterCount, progress,
-    lowestEnergy, bestObjective, tts, feasiblePct,
+    bestObjective, tts, feasiblePct,
   };
 }

@@ -13,7 +13,7 @@ import { DEFAULT_QUBO_FORM } from './types/job';
 
 type ViewMode = 'params' | 'qubo-setup' | 'solve-result' | 'dashboard';
 
-const DEFAULT_SIM_PARAMS: SimParams = { penalty: '1', numReads: '1000', initTemp: '50', coolingRate: '1000' };
+const DEFAULT_SIM_PARAMS: SimParams = { timeout: '30', initTemp: '50', coolingRate: '1000' };
 
 export default function OptimizationDashboard() {
   const [activeId, setActiveId] = useState<string | number | null>(null);
@@ -102,8 +102,7 @@ export default function OptimizationDashboard() {
     });
     // t_start 儲存 N，t_end 儲存 num_iterations
     setSimParams({
-      penalty:     simParams.penalty,
-      numReads:    simParams.numReads,
+      timeout:     String(jobDetail.problem_data?.timeout_seconds ?? 30),
       initTemp:    String(Math.round(jobDetail.t_start ?? 50)),
       coolingRate: String(Math.round(jobDetail.t_end   ?? 1000)),
     });

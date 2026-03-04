@@ -49,7 +49,7 @@ function FlickerValue({ value, large = false }: { value: string; large?: boolean
 // ── 主元件 ──────────────────────────────────────────────────────────
 export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, onStop, onReuseSettings }: Props) {
   const {
-    paramPenalty, paramNumReads, paramInitTemp, paramCoolingRate,
+    paramTimeout, paramInitTemp, paramCoolingRate,
     simHistory,
     isRunning, isCompleted,
     handlePause,
@@ -115,9 +115,8 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
               求解參數
             </p>
-            <ReadRow label="Variables"    value={String(detail?.n_variables ?? '—')} />
-            <ReadRow label="Penalty"      value={paramPenalty} />
-            <ReadRow label="Num Reads"    value={paramNumReads} />
+            <ReadRow label="Variables"     value={String(detail?.n_variables ?? '—')} />
+            <ReadRow label="Timeout"       value={paramTimeout ? `${paramTimeout} s` : '—'} />
             <ReadRow label="Neighbors (N)" value={paramInitTemp} />
             <ReadRow label="Iterations"    value={paramCoolingRate} />
           </div>

@@ -38,8 +38,7 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
 
   const isAEQTS = true; // 所有後端均使用 AEQTS 求解器
 
-  const [penalty,     setPenalty]     = useState(defaultSimParams?.penalty     ?? '1');
-  const [numReads,    setNumReads]    = useState(defaultSimParams?.numReads    ?? '1000');
+  const [timeout,     setTimeout_]    = useState(defaultSimParams?.timeout     ?? '30');
   const [initTemp,    setInitTemp]    = useState(defaultSimParams?.initTemp    ?? '50');
   const [coolingRate, setCoolingRate] = useState(defaultSimParams?.coolingRate ?? '1000');
 
@@ -47,13 +46,13 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
     if (!canSubmit(false)) return;
     const payload = buildPayload();
     // 將 AEQTS 參數實際送入 payload
-    payload.core_limit = Math.max(1, Number(initTemp) || 50);       // Neighbors (N)
+    payload.core_limit = Math.max(1, Number(initTemp) || 50);               // Neighbors (N)
     payload.problem_data = {
       ...payload.problem_data,
-      num_iterations: Math.max(100, Number(coolingRate) || 1000),    // Iterations
-      num_runs:       Math.max(1,   Number(numReads)    || 1),       // Num Reads
+      num_iterations:  Math.max(100, Number(coolingRate) || 1000),           // Iterations
+      timeout_seconds: Math.max(1,   Number(timeout)    || 30),             // 執行時限
     };
-    onNext(payload, { penalty, numReads, initTemp, coolingRate });
+    onNext(payload, { timeout, initTemp, coolingRate });
   };
 
   return (
@@ -159,16 +158,10 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
             <div className="space-y-5">
               <SectionTitle>相關參數</SectionTitle>
               
-              <div className="grid grid-cols-2 gap-3">
-                <CompactField label="Penalty">
-                  <input type="number" min={0.01} step={0.01} value={penalty}
-                    onChange={(e) => setPenalty(e.target.value)} className={compactInputCls} />
-                </CompactField>
-                <CompactField label="Num Reads">
-                  <input type="number" min={1} step={1} value={numReads}
-                    onChange={(e) => setNumReads(e.target.value)} className={compactInputCls} />
-                </CompactField>
-              </div>
+              <CompactField label="Timeout" hint="秒">
+                <input type="number" min={1} step={1} value={timeout}
+                  onChange={(e) => setTimeout_(e.target.value)} className={compactInputCls} />
+              </CompactField>
 
               {isAEQTS && (
                 <>

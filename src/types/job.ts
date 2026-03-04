@@ -21,6 +21,7 @@ export interface JobDetail {
     generation_method: 'random' | 'upload';
     seed?: number;
     filename?: string;
+    timeout_seconds?: number;
   };
   history_data: HistoryDataPoint[];
   computation_time_ms?: number;  // 實際計算時間 (ms)
@@ -56,15 +57,14 @@ export interface CreateJobPayload {
     generation_method: 'random' | 'upload';
     seed?: number;
     filename?: string;
-    num_iterations?: number;  // AEQTS 迭代次數
-    num_runs?: number;        // 重覆執行次數
+    num_iterations?: number;   // AEQTS 迭代次數
+    timeout_seconds?: number;  // 執行時限（秒）
   };
 }
 
 /** AEQTS 求解參數（跨頁傳遞） */
 export interface SimParams {
-  penalty: string;
-  numReads: string;
+  timeout: string;      // 執行時限（秒）
   initTemp: string;     // 鄰域大小 N
   coolingRate: string;  // 迭代次數
 }
