@@ -34,6 +34,13 @@ export default function QuboSetupPage({
   const [qFileName, setQFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Knapsack items 輸入模式 ────────────────────────────
+  type ItemInputMode = 'manual' | 'upload';
+  const [itemInputMode, setItemInputMode] = useState<ItemInputMode>('manual');
+  const [itemFileName, setItemFileName] = useState('');
+  const [itemFileError, setItemFileError] = useState<string | null>(null);
+  const itemFileInputRef = useRef<HTMLInputElement>(null);
+
   // 任何欄位變更時通知 App 層保存
   useEffect(() => {
     onFormChange({ items, capacity, penalty, penaltyTouched });
@@ -90,6 +97,61 @@ export default function QuboSetupPage({
   const isItemsEmpty = normalizedItems.length === 0;
   const isCapacityInvalid = !Number.isFinite(capacityNumber) || capacityNumber <= 0;
   const isPenaltyInvalid = !Number.isFinite(penaltyNumber) || penaltyNumber <= 0;
+
+  // ── Knapsack items file upload ─────────────────────────
+  const handleItemFileUpload = (file: File) => {
+    setItemFileError(null);
+    setItemFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = (e.target?.result as string).trim();
+        let parsed: Array<{ name: string; weight: string; value: string }> = [];
+
+        if (file.name.endsWith('.csv')) {
+          // CSV: 必須包含 header 行 name,weight,value（順序任意）
+          const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+          if (lines.length < 2) throw new Error('CSV 至少需包含 header 行與一列資料');
+          const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+          const nameIdx   = headers.indexOf('name');
+          const weightIdx = headers.indexOf('weight');
+          const valueIdx  = headers.indexOf('value');
+          if (nameIdx < 0 || weightIdx < 0 || valueIdx < 0)
+            throw new Error('CSV header 需包含 name, weight, value 欄位');
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',');
+            const name   = cols[nameIdx]?.trim()   ?? '';
+            const weight = cols[weightIdx]?.trim()  ?? '';
+            const value  = cols[valueIdx]?.trim()   ?? '';
+            if (name === '' && weight === '' && value === '') continue;
+            parsed.push({ name, weight, value });
+          }
+        } else {
+          // JSON: [{name, weight, value}, ...] 或 {items: [...]}
+          const raw = JSON.parse(text);
+          const arr: unknown[] = Array.isArray(raw) ? raw : (Array.isArray(raw.items) ? raw.items : null);
+          if (!arr) throw new Error('JSON 需為陣列 [...] 或 {"items": [...]}');
+          parsed = arr.map((r: unknown, i: number) => {
+            if (typeof r !== 'object' || r === null)
+              throw new Error(`第 ${i + 1} 筆資料不是物件`);
+            const obj = r as Record<string, unknown>;
+            return {
+              name:   String(obj.name   ?? `item-${i + 1}`),
+              weight: String(obj.weight ?? ''),
+              value:  String(obj.value  ?? ''),
+            };
+          });
+        }
+
+        if (parsed.length === 0) throw new Error('解析結果為空，請確認檔案內容');
+        setItems(parsed);
+        setItemFileError(null);
+      } catch (err) {
+        setItemFileError(err instanceof Error ? err.message : '解析失敗，請確認格式');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // ── File upload handler ─────────────────────────────────
   const handleFileUpload = (file: File) => {
@@ -217,26 +279,88 @@ export default function QuboSetupPage({
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <SectionTitle>物品清單（items）</SectionTitle>
-                    <button
-                      onClick={addItem}
-                      className="flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-                    >
-                      <Plus size={14} />
-                      新增物品
-                    </button>
+                    {/* 輸入模式切換 */}
+                    <div className="flex rounded-lg overflow-hidden border border-gray-700/60 text-xs">
+                      <button
+                        onClick={() => setItemInputMode('manual')}
+                        className={`px-3 py-1.5 transition-colors ${itemInputMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-800/60 text-gray-400 hover:text-gray-200'}`}
+                      >
+                        手動輸入
+                      </button>
+                      <button
+                        onClick={() => setItemInputMode('upload')}
+                        className={`px-3 py-1.5 transition-colors ${itemInputMode === 'upload' ? 'bg-indigo-600 text-white' : 'bg-gray-800/60 text-gray-400 hover:text-gray-200'}`}
+                      >
+                        上傳檔案
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1.5">
-                    {items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-[1.2fr_0.9fr_0.9fr_auto] gap-2 items-center">
-                        <input type="text" value={item.name} placeholder="name" onChange={(e) => setItemField(index, 'name', e.target.value)} className={inputCls} />
-                        <input type="number" min={0} step="any" value={item.weight} placeholder="weight" onChange={(e) => setItemField(index, 'weight', e.target.value)} className={inputCls} />
-                        <input type="number" min={0} step="any" value={item.value} placeholder="value" onChange={(e) => setItemField(index, 'value', e.target.value)} className={inputCls} />
-                        <button onClick={() => removeItem(index)} className="text-gray-600 hover:text-rose-400 transition-colors" disabled={items.length <= 1} aria-label="刪除物品">
-                          <Trash2 size={16} />
+
+                  {itemInputMode === 'manual' ? (
+                    <>
+                      <div className="flex justify-end">
+                        <button
+                          onClick={addItem}
+                          className="flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          <Plus size={14} />
+                          新增物品
                         </button>
                       </div>
-                    ))}
-                  </div>
+                      <div className="space-y-2 max-h-72 overflow-y-auto pr-1.5">
+                        {items.map((item, index) => (
+                          <div key={index} className="grid grid-cols-[1.2fr_0.9fr_0.9fr_auto] gap-2 items-center">
+                            <input type="text" value={item.name} placeholder="name" onChange={(e) => setItemField(index, 'name', e.target.value)} className={inputCls} />
+                            <input type="number" min={0} step="any" value={item.weight} placeholder="weight" onChange={(e) => setItemField(index, 'weight', e.target.value)} className={inputCls} />
+                            <input type="number" min={0} step="any" value={item.value} placeholder="value" onChange={(e) => setItemField(index, 'value', e.target.value)} className={inputCls} />
+                            <button onClick={() => removeItem(index)} className="text-gray-600 hover:text-rose-400 transition-colors" disabled={items.length <= 1} aria-label="刪除物品">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="border-2 border-dashed border-gray-700 hover:border-indigo-500/60 rounded-xl p-6 text-center cursor-pointer transition-colors group"
+                        onClick={() => itemFileInputRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleItemFileUpload(f); }}
+                      >
+                        <Upload size={24} className="mx-auto mb-2 text-gray-600 group-hover:text-indigo-400 transition-colors" />
+                        <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">點擊或拖放檔案到此處</p>
+                        <p className="text-xs text-gray-600 mt-1">支援 CSV（需含 name,weight,value 欄位）或 JSON</p>
+                        {itemFileName && <p className="mt-2 text-xs text-indigo-300 font-medium">{itemFileName}</p>}
+                        <input
+                          ref={itemFileInputRef}
+                          type="file"
+                          accept=".csv,.json"
+                          className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleItemFileUpload(f); e.target.value = ''; }}
+                        />
+                      </div>
+                      {itemFileError && (
+                        <div className="text-rose-400 text-xs bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                          {itemFileError}
+                        </div>
+                      )}
+                      {items.length > 0 && !itemFileError && itemFileName && (
+                        <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-1">
+                          <p className="text-xs text-indigo-300 font-semibold">✓ 已載入 {items.length} 個物品</p>
+                          <div className="max-h-40 overflow-y-auto space-y-1 mt-1">
+                            {items.slice(0, 5).map((item, i) => (
+                              <p key={i} className="text-xs text-gray-400 font-mono">
+                                {item.name} &nbsp;·&nbsp; w: {item.weight} &nbsp;·&nbsp; v: {item.value}
+                              </p>
+                            ))}
+                            {items.length > 5 && <p className="text-xs text-gray-600">…還有 {items.length - 5} 個</p>}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {isItemsEmpty && (
                     <p className="text-amber-300 text-xs">目前物品清單為空，請至少新增一筆。</p>
                   )}
