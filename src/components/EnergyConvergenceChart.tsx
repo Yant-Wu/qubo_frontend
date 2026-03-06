@@ -19,6 +19,19 @@ export default function EnergyConvergenceChart({ history }: Props) {
       textStyle: { color: '#9ca3af', fontSize: 10 },
       itemWidth: 14,
       itemHeight: 8,
+      tooltip: {
+        show: true,
+        backgroundColor: '#1f2937',
+        borderColor: '#374151',
+        textStyle: { color: '#e5e7eb', fontSize: 11 },
+        formatter: (params: { name: string }) => {
+          if (params.name === 'Best Objective')
+            return '歷史最佳解的總價值<br/>只增不減，最右端即為最終答案';
+          if (params.name === 'QUBO Energy')
+            return '含懲罰項的能量值，用來導引搜索方向<br/>數值越負代表解越好且越可行';
+          return params.name;
+        },
+      },
     } : undefined,
     xAxis: {
       type: 'value',
@@ -53,6 +66,11 @@ export default function EnergyConvergenceChart({ history }: Props) {
     ].filter(Boolean),
     tooltip: {
       trigger: 'axis',
+      axisPointer: {
+        type: 'line',
+        snap: true,
+        lineStyle: { color: '#6b7280', type: 'dashed', width: 1 },
+      },
       backgroundColor: '#1f2937',
       borderColor: '#374151',
       textStyle: { color: '#e5e7eb', fontSize: 11 },
