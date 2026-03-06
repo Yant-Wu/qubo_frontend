@@ -21,12 +21,17 @@ export interface JobDetail {
     generation_method: 'random' | 'upload';
     seed?: number;
     filename?: string;
+    num_iterations?: number;
     timeout_seconds?: number;
     Q_matrix?: number[][];     // custom 類型的 QUBO 矩陣
     // Knapsack 表單紀錄
     items?: Array<{ name: string; weight: number; value: number }>;
     capacity?: number;
     penalty?: number;
+    // 求解結果（存回 DB，刷新後不消失）
+    selected_items?: Array<{ name: string; weight: number; value: number }>;
+    total_value?: number;
+    total_weight?: number;
   };
   history_data: HistoryDataPoint[];
   computation_time_ms?: number;  // 實際計算時間 (ms)
@@ -40,7 +45,8 @@ export interface JobDetail {
 export interface HistoryDataPoint {
   iteration: number;
   value: number;
-  entropy?: number | null;       // AEQTS Q-bit entropy（0=完全收斂，1=最大不確定）
+  qubo_energy?: number | null;    // 當前迭代的 QUBO 能量（每次都會變）
+  entropy?: number | null;        // AEQTS Q-bit entropy（0=完全收斂，1=最大不確定）
   is_feasible?: boolean | null;
   [key: string]: unknown;
 }

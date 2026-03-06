@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { useJobs } from './hooks/useJobs';
 import { useJobDetail } from './hooks/useJobDetail';
 import { useSolveKnapsack } from './hooks/useSolveKnapsack';
-import { createJob, deleteJob } from './services/jobService';
+import { deleteJob } from './services/jobService';
 import Sidebar from './components/Sidebar';
 import ParamsPage from './components/ParamsPage';
 import QuboSetupPage from './components/QuboSetupPage';
-import SolveResultPanel from './components/SolveResultPanel';
 import QuboMonitorPanel from './components/QuboMonitorPanel';
-import type { CreateJobPayload, SimParams, KnapsackSolveRequest, QuboFormData } from './types/job';
+import type { CreateJobPayload, SimParams, KnapsackSolveRequest, QuboFormData, KnapsackSolveResponse } from './types/job';
 import { DEFAULT_QUBO_FORM } from './types/job';
 
 type ViewMode = 'params' | 'qubo-setup' | 'solve-result' | 'dashboard';
@@ -27,7 +26,8 @@ export default function OptimizationDashboard() {
 
   const { jobList, isLoading: isListLoading, error: listError, refetch: refetchList } = useJobs();
   const { detail: jobDetail, isLoading: isDetailLoading, error: detailError } = useJobDetail(activeId);
-  const { solve, isSubmitting, error: solveError, result: solveResult, reset: resetSolveState } = useSolveKnapsack();
+  const { solve, isSubmitting, error: solveError, reset: resetSolveState } = useSolveKnapsack();
+  const [lastSolveResult, setLastSolveResult] = useState<KnapsackSolveResponse | null>(null);
 
   // 任務已從列表消失時返回首頁
   useEffect(() => {
@@ -51,21 +51,6 @@ export default function OptimizationDashboard() {
   // ── Page 2 → Page 1 ─────────────────────────────────────────────
   const handleQuboBack = () => setViewMode('params');
 
-  // ── Page 2 提交（Custom QUBO：直接建立 Job，不過 /solve）───────
-  const handleCustomQuboSubmit = (qMatrix: number[][]) => {
-    if (pendingPayload) {
-      const updatedPayload = {
-        ...pendingPayload,
-        n_variables: qMatrix.length,
-        problem_data: { ...pendingPayload.problem_data, Q_matrix: qMatrix },
-      };
-      createJob(updatedPayload)
-        .then((job) => { setActiveId(job.id); return refetchList(); })
-        .catch((err) => console.error('建立自訂 QUBO 任務失敗:', err));
-    }
-    setViewMode('dashboard');
-  };
-
   // ── Page 2 提交（POST /api/jobs/solve，同步執行）─────────────
   const handleQuboSubmit = async (payload: KnapsackSolveRequest) => {
     if (!pendingPayload) return;
@@ -82,18 +67,22 @@ export default function OptimizationDashboard() {
       },
     };
 
+    // 先跳到監控頁顯示運算進度，再等待後端回傳
+    setViewMode('dashboard');
+
     // 統一求解：建立 Job + 執行 AEQTS + 儲存歷史（一次呼叫完成）
     const result = await solve(enrichedPayload);
-    if (result === null) return;
+    if (result === null) {
+      setViewMode('qubo-setup'); // 失敗則退回設定頁
+      return;
+    }
 
     // job 已 completed，設定 activeId 並刷新側邊欄列表
     if (result.job_id) {
+      setLastSolveResult(result);
       setActiveId(result.job_id);
       void refetchList();
     }
-
-    // 停在求解結果頁，使用者手動決定是否查看收斂監控
-    setViewMode('solve-result');
   };
 
   // ── 從側邊欄選歷史任務（跳過前兩頁直接進儀錶板） ───────────────
@@ -116,25 +105,24 @@ export default function OptimizationDashboard() {
   // ── 套用此設定重新執行 ───────────────────────────────────────
   const handleReuseSettings = () => {
     if (!jobDetail) return;
-    // 從已完成的 job 提取設定
+    const pd = jobDetail.problem_data;
+
+    // 還原 ParamsPage 的設定
     setReusePayload({
       task_name:      jobDetail.task_name,
       problem_type:   jobDetail.problem_type,
       n_variables:    jobDetail.n_variables,
       solver_backend: jobDetail.solver_backend,
       core_limit:     jobDetail.core_limit,
-      problem_data: {
-        generation_method: 'upload',
-      },
+      problem_data: { generation_method: 'upload' },
     });
-    // t_start 儲存 N，t_end 儲存 num_iterations
     setSimParams({
-      timeout:     String(jobDetail.problem_data?.timeout_seconds ?? 30),
-      initTemp:    String(Math.round(jobDetail.t_start ?? 50)),
-      coolingRate: String(Math.round(jobDetail.t_end   ?? 1000)),
+      timeout:     String(pd?.timeout_seconds ?? Math.round(jobDetail.t_start ?? 30)),
+      initTemp:    String(jobDetail.core_limit ?? Math.round(jobDetail.t_start ?? 50)),
+      coolingRate: String(pd?.num_iterations  ?? Math.round(jobDetail.t_end   ?? 1000)),
     });
+
     // 還原 QuboSetupPage 的 Knapsack 表單
-    const pd = jobDetail.problem_data;
     if (pd?.items && pd.items.length > 0) {
       setQuboFormData({
         items: pd.items.map(item => ({
@@ -142,12 +130,15 @@ export default function OptimizationDashboard() {
           weight: String(item.weight),
           value:  String(item.value),
         })),
-        capacity:      String(pd.capacity ?? 10),
-        penalty:       String(pd.penalty  ?? 0),
+        capacity:       String(pd.capacity ?? 10),
+        penalty:        String(pd.penalty  ?? 0),
         penaltyTouched: pd.penalty != null,
       });
     }
+
     resetSolveState();
+    setLastSolveResult(null);
+    setActiveId(null);
     setPendingPayload(null);
     setViewMode('params');
   };
@@ -234,17 +225,8 @@ export default function OptimizationDashboard() {
               error={solveError}
               onBack={handleQuboBack}
               onSubmit={handleQuboSubmit}
-              onSubmitCustom={handleCustomQuboSubmit}
               initialFormData={quboFormData}
               onFormChange={setQuboFormData}
-            />
-          )}
-
-          {viewMode === 'solve-result' && solveResult && (
-            <SolveResultPanel
-              result={solveResult}
-              onBack={() => setViewMode('qubo-setup')}
-              onViewMonitor={() => setViewMode('dashboard')}
             />
           )}
 
@@ -255,7 +237,9 @@ export default function OptimizationDashboard() {
               isLoading={isDetailLoading}
               loadError={detailError}
               simParams={simParams}
-              onStop={() => activeId !== null && handleStopJob(activeId)}
+              isSolving={isSubmitting}
+              solveResult={lastSolveResult}
+              onStop={() => activeId !== null ? handleStopJob(activeId) : setViewMode('qubo-setup')}
               onReuseSettings={handleReuseSettings}
             />
           )}

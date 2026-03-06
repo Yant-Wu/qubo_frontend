@@ -5,8 +5,6 @@ import type { CreateJobPayload } from '../types/job';
 
 export const PROBLEM_TYPES = [
   { value: 'knapsack', label: '背包問題 (Knapsack)' },
-  { value: 'max_cut',  label: '最大割問題 (Max-Cut)' },
-  { value: 'custom',   label: '自訂問題 (Custom)' },
 ] as const;
 
 export interface UseCreateJobFormReturn {

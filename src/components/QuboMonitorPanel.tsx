@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Play } from 'lucide-react';
 import type { JobDetail, SimParams } from '../types/job';
+import type { KnapsackSolveResponse } from '../types/job';
 import { useQuboSimulation } from '../hooks/useQuboSimulation';
 import EnergyConvergenceChart from './EnergyConvergenceChart';
 import EntropyChart from './EntropyChart';
@@ -15,6 +16,8 @@ interface Props {
   isLoading?: boolean;
   loadError?: string | null;
   simParams?: SimParams;
+  isSolving?: boolean;
+  solveResult?: KnapsackSolveResponse | null;
   onStop: () => void;
   onReuseSettings?: () => void;
 }
@@ -47,15 +50,25 @@ function FlickerValue({ value, large = false }: { value: string; large?: boolean
 }
 
 // ── 主元件 ──────────────────────────────────────────────────────────
-export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, onStop, onReuseSettings }: Props) {
+export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, isSolving = false, solveResult, onStop, onReuseSettings }: Props) {
   const {
     paramTimeout, paramInitTemp, paramCoolingRate,
     simHistory,
     isRunning, isCompleted,
     handlePause,
-    numReads, iterCount, progress,
+    numReads: _numReads, iterCount, progress: _progress,
     bestObjective, tts, feasiblePct,
   } = useQuboSimulation(jobId, detail, simParams);
+
+  // 優先使用 jobDetail 裡儲存的結果（刷新後也存在），其次才用 solveResult這次小時的記憶
+  const pd = detail?.problem_data;
+  const displaySelected: Array<{ name: string; weight: number; value: number }> =
+    (pd?.selected_items && pd.selected_items.length > 0)
+      ? pd.selected_items
+      : (solveResult?.selected_items ?? []);
+  const displayTotalValue  = pd?.total_value  ?? solveResult?.total_value;
+  const displayTotalWeight = pd?.total_weight ?? solveResult?.total_weight;
+  const displayTimeMs = solveResult?.computation_time_ms ?? detail?.computation_time_ms;
 
   const [activeTab, setActiveTab] = useState<ChartTab>('convergence');
 
@@ -142,7 +155,7 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
                 <div className="border-t border-gray-700/40 my-1" />
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] text-gray-500">Compute</span>
-                  {detail.compute_device === 'gpu' ? (
+                  {detail.compute_device === 'gpu' || detail.compute_device === 'cuda' ? (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
                                     bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
                       ⚡ GPU
@@ -172,7 +185,43 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             <MetricBlock label="Feasible Solutions">
               <FlickerValue value={feasiblePct !== '—' ? `${feasiblePct} %` : '—'} large />
             </MetricBlock>
+            {solveResult && (
+              <>
+                <div className="border-t border-gray-700/40 pt-1 space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-500">Total Value</span>
+                    <span className="font-mono text-emerald-300 font-semibold">{displayTotalValue ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-500">Total Weight</span>
+                    <span className="font-mono text-indigo-300 font-semibold">{displayTotalWeight ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-500">Time</span>
+                    <span className="font-mono text-gray-300">{displayTimeMs != null ? `${displayTimeMs} ms` : '—'}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* 選中物品清單 */}
+          {displaySelected.length > 0 && (
+            <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                Selected Items ({displaySelected.length})
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                {displaySelected.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-gray-900/60 border border-gray-700/30 px-2.5 py-1.5">
+                    <span className="text-[11px] text-gray-100 font-medium truncate flex-1">{item.name}</span>
+                    <span className="text-[10px] text-gray-500 shrink-0">w:<span className="text-indigo-300 font-mono ml-0.5">{item.weight}</span></span>
+                    <span className="text-[10px] text-gray-500 shrink-0">v:<span className="text-emerald-300 font-mono ml-0.5">{item.value}</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1" />
 
@@ -235,15 +284,27 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
           {!isRunning && !isCompleted && iterCount === 0 ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto">
-                  <Play size={28} className="text-indigo-400 ml-1" />
-                </div>
-                <div>
-                  <p className="text-gray-300 text-sm font-medium">等待資料</p>
-                  <p className="text-gray-600 text-xs mt-1">
-                    {detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}
-                  </p>
-                </div>
+                {isSolving ? (
+                  <>
+                    <div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" />
+                    <div>
+                      <p className="text-gray-300 text-sm font-medium">後端運算中…</p>
+                      <p className="text-gray-600 text-xs mt-1">AEQTS 正在求解，請稍候</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto">
+                      <Play size={28} className="text-indigo-400 ml-1" />
+                    </div>
+                    <div>
+                      <p className="text-gray-300 text-sm font-medium">等待資料</p>
+                      <p className="text-gray-600 text-xs mt-1">
+                        {detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -263,19 +324,7 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
         </div>
       </div>
 
-      {/* ── 全寬進度條（底部） ─────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-5 py-3 border-t border-gray-800/60 bg-gray-900/60">
-        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
-          <span className="font-medium">進度</span>
-          <span className="font-mono">{iterCount} / {numReads}</span>
-        </div>
-        <div className="h-2.5 rounded-full bg-gray-800 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-150"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
+
     </div>
   );
 }
