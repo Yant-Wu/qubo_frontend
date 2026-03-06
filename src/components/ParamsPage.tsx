@@ -19,16 +19,10 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
   const {
     taskName, setTaskName,
     problemType, setProblemType,
-    genMethod, setGenMethod,
-    nVariables, setNVariables,
-    seed, setSeed,
     canSubmit, buildPayload,
   } = useCreateJobForm(initPayload ? {
     taskName:    initPayload.task_name    ? initPayload.task_name + (copySuffix ? ' (copy)' : '') : undefined,
     problemType: initPayload.problem_type,
-    genMethod:   initPayload.problem_data?.generation_method,
-    nVariables:  initPayload.n_variables  ? String(initPayload.n_variables) : undefined,
-    seed:        initPayload.problem_data?.seed != null ? String(initPayload.problem_data.seed) : undefined,
   } : undefined);
 
   const isAEQTS = true; // 所有後端均使用 AEQTS 求解器
@@ -82,39 +76,7 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
                 </select>
               </CompactField>
 
-              <CompactField label="資料集">
-                <div className="flex gap-3 text-sm mb-2">
-                  {(['random', 'upload'] as const).map((m) => (
-                    <label key={m} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio" name="genMethod" value={m}
-                        checked={genMethod === m}
-                        onChange={() => setGenMethod(m)}
-                        className="accent-indigo-500 w-4 h-4"
-                      />
-                      <span className="text-gray-300">
-                        {m === 'random' ? '隨機' : '上傳'}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {genMethod === 'random' ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="number" min={1} value={nVariables}
-                      onChange={(e) => setNVariables(e.target.value)}
-                      placeholder="變數數 (N)"
-                      className={compactInputCls} />
-                    <input type="number" min={0} value={seed}
-                      onChange={(e) => setSeed(e.target.value)}
-                      placeholder="種子"
-                      className={compactInputCls} />
-                  </div>
-                ) : (
-                  <div className="text-center py-4 rounded-lg border border-dashed border-gray-700/60 text-gray-600 text-sm">
-                    (開發中)
-                  </div>
-                )}
-              </CompactField>
+
             </div>
 
             {/* ── 右欄：相關參數 ───────────────────────────────────────── */}

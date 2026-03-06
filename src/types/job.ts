@@ -32,6 +32,7 @@ export interface JobDetail {
   computation_time_ms?: number;  // 實際計算時間 (ms)
   t_start?: number;              // AEQTS 鄰域大小 N
   t_end?: number;                // AEQTS 迭代次數
+  compute_device?: 'gpu' | 'cpu' | string;  // 實際執行裝置
   created_at?: string;
 }
 
@@ -115,10 +116,12 @@ export interface KnapsackSolveRequest {
 }
 
 export interface KnapsackSolveResponse {
+  job_id: string;
   selected_items: KnapsackItem[];
   total_value: number;
   total_weight: number;
   energy: number;
   computation_time_ms: number;
+  device?: string;
 }
 

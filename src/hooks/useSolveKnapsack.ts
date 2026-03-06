@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
-import { solveKnapsack } from '../services/solveService';
-import type { KnapsackSolveRequest, KnapsackSolveResponse } from '../types/job';
+import { solveAndCreate } from '../services/solveService';
+import type { CreateJobPayload, KnapsackSolveResponse } from '../types/job';
 
 interface UseSolveKnapsackReturn {
-  solve: (payload: KnapsackSolveRequest) => Promise<KnapsackSolveResponse | null>;
+  solve: (payload: CreateJobPayload) => Promise<KnapsackSolveResponse | null>;
   isSubmitting: boolean;
   error: string | null;
   result: KnapsackSolveResponse | null;
@@ -30,11 +30,11 @@ export function useSolveKnapsack(): UseSolveKnapsackReturn {
     setResult(null);
   }, []);
 
-  const solve = useCallback(async (payload: KnapsackSolveRequest): Promise<KnapsackSolveResponse | null> => {
+  const solve = useCallback(async (payload: CreateJobPayload): Promise<KnapsackSolveResponse | null> => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await solveKnapsack(payload);
+      const response = await solveAndCreate(payload);
       setResult(response);
       return response;
     } catch (err) {

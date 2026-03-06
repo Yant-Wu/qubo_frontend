@@ -66,29 +66,33 @@ export default function OptimizationDashboard() {
     setViewMode('dashboard');
   };
 
-  // ── Page 2 提交（POST /solve）—————————————————————————
+  // ── Page 2 提交（POST /api/jobs/solve，同步執行）─────────────
   const handleQuboSubmit = async (payload: KnapsackSolveRequest) => {
-    // 1. 即時求解（POST /solve）
-    const result = await solve(payload);
+    if (!pendingPayload) return;
+
+    // 將 Page 2 輸入的物品/容量/懲罰合併進完整的 Job payload
+    const enrichedPayload: CreateJobPayload = {
+      ...pendingPayload,
+      n_variables: payload.items.length,   // 以實際物品數覆蓋 placeholder
+      problem_data: {
+        ...pendingPayload.problem_data,
+        items:    payload.items,
+        capacity: payload.capacity,
+        penalty:  payload.penalty,
+      },
+    };
+
+    // 統一求解：建立 Job + 執行 AEQTS + 儲存歷史（一次呼叫完成）
+    const result = await solve(enrichedPayload);
     if (result === null) return;
 
-    // 2. 背量建立 Job（不阻塞 UI），同時把表單值存入 problem_data 供日後還原
-    if (pendingPayload) {
-      const enrichedPayload: CreateJobPayload = {
-        ...pendingPayload,
-        problem_data: {
-          ...pendingPayload.problem_data,
-          items:    payload.items,
-          capacity: payload.capacity,
-          penalty:  payload.penalty,
-        },
-      };
-      createJob(enrichedPayload)
-        .then((job) => { setActiveId(job.id); return refetchList(); })
-        .catch((err) => console.error('建立歷史任務失敗:', err));
+    // job 已 completed，設定 activeId 並刷新側邊欄列表
+    if (result.job_id) {
+      setActiveId(result.job_id);
+      void refetchList();
     }
 
-    // 3. 停在求解結果頁，使用者手動決定是否查看監控
+    // 停在求解結果頁，使用者手動決定是否查看收斂監控
     setViewMode('solve-result');
   };
 
@@ -120,8 +124,7 @@ export default function OptimizationDashboard() {
       solver_backend: jobDetail.solver_backend,
       core_limit:     jobDetail.core_limit,
       problem_data: {
-        generation_method: jobDetail.problem_data?.generation_method ?? 'random',
-        seed:              jobDetail.problem_data?.seed,
+        generation_method: 'upload',
       },
     });
     // t_start 儲存 N，t_end 儲存 num_iterations

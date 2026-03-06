@@ -136,7 +136,26 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             <ReadRow label="Timeout"       value={paramTimeout ? `${paramTimeout} s` : '—'} />
             <ReadRow label="Neighbors (N)" value={paramInitTemp} />
             <ReadRow label="Iterations"    value={paramCoolingRate} />
-
+            {/* ── GPU/CPU 裝置桜── */}
+            {detail?.compute_device && (
+              <>
+                <div className="border-t border-gray-700/40 my-1" />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-gray-500">Compute</span>
+                  {detail.compute_device === 'gpu' ? (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+                                    bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
+                      ⚡ GPU
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+                                    bg-gray-700/50 text-gray-400 border border-gray-600/50">
+                      ■ CPU
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* 最佳化指標（大字 + 閃爍） */}

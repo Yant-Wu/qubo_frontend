@@ -15,12 +15,6 @@ export interface UseCreateJobFormReturn {
   setTaskName: (v: string) => void;
   problemType: string;
   setProblemType: (v: string) => void;
-  genMethod: 'random' | 'upload';
-  setGenMethod: (v: 'random' | 'upload') => void;
-  nVariables: string;
-  setNVariables: (v: string) => void;
-  seed: string;
-  setSeed: (v: string) => void;
 
   // 衍生狀態
   canSubmit: (isSubmitting: boolean) => boolean;
@@ -32,15 +26,9 @@ export interface UseCreateJobFormReturn {
 export function useCreateJobForm(initialValues?: {
   taskName?: string;
   problemType?: string;
-  genMethod?: 'random' | 'upload';
-  nVariables?: string;
-  seed?: string;
 }): UseCreateJobFormReturn {
-  const [taskName,     setTaskName]     = useState(initialValues?.taskName     ?? '');
-  const [problemType,  setProblemType]  = useState(initialValues?.problemType  ?? 'knapsack');
-  const [genMethod,    setGenMethod]    = useState<'random' | 'upload'>(initialValues?.genMethod ?? 'random');
-  const [nVariables,   setNVariables]   = useState(initialValues?.nVariables   ?? '50');
-  const [seed,         setSeed]         = useState(initialValues?.seed         ?? '42');
+  const [taskName,     setTaskName]     = useState(initialValues?.taskName    ?? '');
+  const [problemType,  setProblemType]  = useState(initialValues?.problemType ?? 'knapsack');
 
   const canSubmit = (isSubmitting: boolean) =>
     Boolean(taskName.trim()) && !isSubmitting;
@@ -48,20 +36,16 @@ export function useCreateJobForm(initialValues?: {
   const buildPayload = (): CreateJobPayload => ({
     task_name:      taskName.trim(),
     problem_type:   problemType,
-    n_variables:    Number(nVariables) || 50,
-    solver_backend: 'simulated_annealing',  // 固定使用 AEQTS
+    n_variables:    1,             // 實際值由 Page 2 物品數量覆蓋
+    solver_backend: 'simulated_annealing',
     problem_data: {
-      generation_method: genMethod,
-      ...(genMethod === 'random' ? { seed: Number(seed) || 42 } : {}),
+      generation_method: 'upload', // 固定為手動輸入，不走後端隨機生成
     },
   });
 
   return {
     taskName, setTaskName,
     problemType, setProblemType,
-    genMethod, setGenMethod,
-    nVariables, setNVariables,
-    seed, setSeed,
     canSubmit,
     buildPayload,
   };
