@@ -25,23 +25,19 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
     problemType: initPayload.problem_type,
   } : undefined);
 
-  const isAEQTS = true; // 所有後端均使用 AEQTS 求解器
-
-  const [timeout,     setTimeout_]    = useState(defaultSimParams?.timeout     ?? '30');
-  const [initTemp,    setInitTemp]    = useState(defaultSimParams?.initTemp    ?? '50');
-  const [coolingRate, setCoolingRate] = useState(defaultSimParams?.coolingRate ?? '1000');
+  const [timeout, setTimeout_] = useState(defaultSimParams?.timeout ?? '30');
 
   const handleNext = () => {
     if (!canSubmit(false)) return;
     const payload = buildPayload();
     // 將 AEQTS 參數實際送入 payload
-    payload.core_limit = Math.max(1, Number(initTemp) || 50);               // Neighbors (N)
+    payload.core_limit = 50;                 // Neighbors (N) 固定預設
     payload.problem_data = {
       ...payload.problem_data,
-      num_iterations:  Math.max(100, Number(coolingRate) || 1000),           // Iterations
-      timeout_seconds: Math.max(1,   Number(timeout)    || 30),             // 執行時限
+      num_iterations:  1000,                 // Iterations 固定預設
+      timeout_seconds: Math.max(1, Number(timeout) || 30),
     };
-    onNext(payload, { timeout, initTemp, coolingRate });
+    onNext(payload, { timeout, initTemp: '50', coolingRate: '1000' });
   };
 
   return (
@@ -88,22 +84,6 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
                   onChange={(e) => setTimeout_(e.target.value)} className={compactInputCls} />
               </CompactField>
 
-              {isAEQTS && (
-                <>
-                  <SectionTitle>AEQTS 參數</SectionTitle>
-                  <div className="grid grid-cols-2 gap-3">
-                    <CompactField label="Neighbors (N)" hint="鄰域大小">
-                      <input type="number" min={1} step={1} value={initTemp}
-                        onChange={(e) => setInitTemp(e.target.value)} className={compactInputCls} />
-                    </CompactField>
-                    <CompactField label="Iterations" hint="迭代次數">
-                      <input type="number" min={100} step={100} value={coolingRate}
-                        onChange={(e) => setCoolingRate(e.target.value)} className={compactInputCls} />
-                    </CompactField>
-                  </div>
-                </>
-              )}
-
               {/* 下一步按鈕 */}
               <button
                 onClick={handleNext}
@@ -123,7 +103,7 @@ export default function ParamsPage({ onNext, defaultSimParams, defaultPayload, r
 
 // ── 小元件 ────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{children}</h3>;
+  return <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-widest">{children}</h3>;
 }
 
 function CompactField({ label, required, hint, children }: {
@@ -132,10 +112,10 @@ function CompactField({ label, required, hint, children }: {
   return (
     <fieldset className="flex flex-col gap-1">
       <div className="flex items-baseline gap-1.5">
-        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+        <label className="text-sm font-medium text-gray-100 uppercase tracking-wider">
           {label}{required && <span className="text-rose-400">*</span>}
         </label>
-        {hint && <span className="text-[10px] text-gray-600 font-normal">({hint})</span>}
+        {hint && <span className="text-xs text-white font-normal">({hint})</span>}
       </div>
       {children}
     </fieldset>
@@ -143,5 +123,5 @@ function CompactField({ label, required, hint, children }: {
 }
 
 const compactInputCls =
-  'bg-gray-800/60 border border-gray-700/50 rounded-lg px-3.5 py-2 text-sm text-gray-100 w-full ' +
+  'bg-gray-800/60 border border-gray-700/50 rounded-lg px-3.5 py-2.5 text-base text-gray-100 w-full ' +
   'placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition-colors';

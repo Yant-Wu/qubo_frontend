@@ -4,26 +4,29 @@ import type { HistoryDataPoint } from '../types/job';
 
 interface Props {
   history: HistoryDataPoint[];
+  compact?: boolean;
 }
 
-export default function EnergyConvergenceChart({ history }: Props) {
+export default function EnergyConvergenceChart({ history, compact = false }: Props) {
   if (history.length === 0) return null;
 
   const hasQE = history.some((d) => d.qubo_energy != null);
 
   const option = {
     backgroundColor: 'transparent',
-    grid: { top: 32, right: hasQE ? 60 : 16, bottom: 36, left: 52 },
-    legend: hasQE ? {
-      top: 4,
-      textStyle: { color: '#9ca3af', fontSize: 10 },
-      itemWidth: 14,
-      itemHeight: 8,
+    grid: compact
+      ? { top: 6, right: 6, bottom: 6, left: 6 }
+      : { top: 36, right: hasQE ? 70 : 16, bottom: 40, left: 60 },
+    legend: compact ? undefined : hasQE ? {
+      top: 6,
+      textStyle: { color: '#e5e7eb', fontSize: 15 },
+      itemWidth: 16,
+      itemHeight: 10,
       tooltip: {
         show: true,
         backgroundColor: '#1f2937',
         borderColor: '#374151',
-        textStyle: { color: '#e5e7eb', fontSize: 11 },
+        textStyle: { color: '#e5e7eb', fontSize: 15 },
         formatter: (params: { name: string }) => {
           if (params.name === 'Best Objective')
             return '歷史最佳解的總價值<br/>只增不減，最右端即為最終答案';
@@ -35,11 +38,11 @@ export default function EnergyConvergenceChart({ history }: Props) {
     } : undefined,
     xAxis: {
       type: 'value',
-      name: 'Iteration',
-      nameTextStyle: { color: '#6b7280', fontSize: 10 },
+      name: compact ? '' : 'Iteration',
+      nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
       axisLine: { lineStyle: { color: '#374151' } },
-      axisTick: { lineStyle: { color: '#374151' } },
-      axisLabel: { color: '#6b7280', fontSize: 10 },
+      axisTick: { show: !compact, lineStyle: { color: '#374151' } },
+      axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
       splitLine: { lineStyle: { color: '#1f2937' } },
       min: 1,
       max: history[history.length - 1]?.iteration ?? 1,
@@ -47,24 +50,24 @@ export default function EnergyConvergenceChart({ history }: Props) {
     yAxis: [
       {
         type: 'value',
-        name: 'Best Value',
-        nameTextStyle: { color: '#6b7280', fontSize: 10 },
+        name: compact ? '' : 'Best Value',
+        nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
         axisLine: { lineStyle: { color: '#374151' } },
-        axisTick: { lineStyle: { color: '#374151' } },
-        axisLabel: { color: '#6b7280', fontSize: 10 },
+        axisTick: { show: !compact, lineStyle: { color: '#374151' } },
+        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
         splitLine: { lineStyle: { color: '#1f2937' } },
       },
       hasQE ? {
         type: 'value',
-        name: 'QUBO Energy',
-        nameTextStyle: { color: '#6b7280', fontSize: 10 },
+        name: compact ? '' : 'QUBO Energy',
+        nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
         axisLine: { lineStyle: { color: '#374151' } },
-        axisTick: { lineStyle: { color: '#374151' } },
-        axisLabel: { color: '#6b7280', fontSize: 10 },
+        axisTick: { show: !compact, lineStyle: { color: '#374151' } },
+        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
         splitLine: { show: false },
       } : undefined,
     ].filter(Boolean),
-    tooltip: {
+    tooltip: compact ? { show: false } : {
       trigger: 'axis',
       axisPointer: {
         type: 'line',
@@ -73,7 +76,7 @@ export default function EnergyConvergenceChart({ history }: Props) {
       },
       backgroundColor: '#1f2937',
       borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 11 },
+      textStyle: { color: '#e5e7eb', fontSize: 15 },
       formatter: (params: { seriesName: string; value: number[] }[]) =>
         params
           .map((p) => `${p.seriesName}: <b>${p.value[1].toFixed(4)}</b>`)

@@ -5,6 +5,7 @@ import type { CreateJobPayload } from '../types/job';
 
 export const PROBLEM_TYPES = [
   { value: 'knapsack', label: '背包問題 (Knapsack)' },
+  { value: 'custom',   label: '自定義 QUBO 矩陣 (Custom)' },
 ] as const;
 
 export interface UseCreateJobFormReturn {

@@ -6,9 +6,10 @@ import type { HistoryDataPoint } from '../types/job';
 
 interface Props {
   history: HistoryDataPoint[];
+  compact?: boolean;
 }
 
-export default function EntropyChart({ history }: Props) {
+export default function EntropyChart({ history, compact = false }: Props) {
   const data = history.filter((d) => d.entropy != null);
   if (data.length === 0) {
     return (
@@ -20,30 +21,32 @@ export default function EntropyChart({ history }: Props) {
 
   const option = {
     backgroundColor: 'transparent',
-    grid: { top: 24, right: 16, bottom: 36, left: 52 },
+    grid: compact
+      ? { top: 6, right: 6, bottom: 6, left: 6 }
+      : { top: 24, right: 16, bottom: 36, left: 52 },
     xAxis: {
       type: 'value',
-      name: 'Iteration',
+      name: compact ? '' : 'Iteration',
       nameTextStyle: { color: '#6b7280', fontSize: 10 },
       axisLine: { lineStyle: { color: '#374151' } },
-      axisTick: { lineStyle: { color: '#374151' } },
-      axisLabel: { color: '#6b7280', fontSize: 10 },
+      axisTick: { show: !compact, lineStyle: { color: '#374151' } },
+      axisLabel: { show: !compact, color: '#6b7280', fontSize: 10 },
       splitLine: { lineStyle: { color: '#1f2937' } },
       min: 0,
       max: data[data.length - 1]?.iteration ?? 1,
     },
     yAxis: {
       type: 'value',
-      name: 'Entropy',
+      name: compact ? '' : 'Entropy',
       nameTextStyle: { color: '#6b7280', fontSize: 10 },
       axisLine: { lineStyle: { color: '#374151' } },
-      axisTick: { lineStyle: { color: '#374151' } },
-      axisLabel: { color: '#6b7280', fontSize: 10 },
+      axisTick: { show: !compact, lineStyle: { color: '#374151' } },
+      axisLabel: { show: !compact, color: '#6b7280', fontSize: 10 },
       splitLine: { lineStyle: { color: '#1f2937' } },
       min: 0,
       max: 1,
     },
-    tooltip: {
+    tooltip: compact ? { show: false } : {
       trigger: 'axis',
       backgroundColor: '#1f2937',
       borderColor: '#374151',

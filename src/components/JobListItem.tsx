@@ -26,7 +26,7 @@ export default function JobListItem({ item, isActive, onSelect, onDelete }: Prop
         }`}
     >
       <div className="flex items-center justify-between">
-        <div className={`text-sm font-medium truncate flex-1 ${isActive ? 'text-indigo-300' : 'text-gray-300 group-hover:text-white'}`}>
+        <div className={`text-sm font-medium truncate flex-1 ${isActive ? 'text-indigo-300' : 'text-white'}`}>
           {item.task_name}
         </div>
         <div
@@ -43,7 +43,7 @@ export default function JobListItem({ item, isActive, onSelect, onDelete }: Prop
       <div className="flex items-center justify-between mt-1.5">
         <StatusBadge status={item.status} />
         {item.created_at && (
-          <span className="text-[10px] text-gray-500">{item.created_at}</span>
+          <span className="text-xs text-gray-300">{item.created_at}</span>
         )}
       </div>
     </button>

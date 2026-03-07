@@ -55,16 +55,25 @@ export default function OptimizationDashboard() {
   const handleQuboSubmit = async (payload: KnapsackSolveRequest) => {
     if (!pendingPayload) return;
 
-    // 將 Page 2 輸入的物品/容量/懲罰合併進完整的 Job payload
+    // 將 Page 2 輸入的物品/容量/懲罰（或 Q_matrix）合併進完整的 Job payload
+    const isCustom = pendingPayload.problem_type === 'custom';
     const enrichedPayload: CreateJobPayload = {
       ...pendingPayload,
-      n_variables: payload.items.length,   // 以實際物品數覆蓋 placeholder
-      problem_data: {
-        ...pendingPayload.problem_data,
-        items:    payload.items,
-        capacity: payload.capacity,
-        penalty:  payload.penalty,
-      },
+      n_variables: isCustom
+        ? (payload.Q_matrix?.length ?? 0)
+        : payload.items.length,
+      problem_data: isCustom
+        ? {
+            ...pendingPayload.problem_data,
+            Q_matrix: payload.Q_matrix,
+          }
+        : {
+            ...pendingPayload.problem_data,
+            items:    payload.items,
+            capacity: payload.capacity,
+            penalty:  payload.penalty,
+            ...(payload.slack_bits !== undefined && { slack_bits: payload.slack_bits }),
+          },
     };
 
     // 先跳到監控頁顯示運算進度，再等待後端回傳
@@ -133,6 +142,7 @@ export default function OptimizationDashboard() {
         capacity:       String(pd.capacity ?? 10),
         penalty:        String(pd.penalty  ?? 0),
         penaltyTouched: pd.penalty != null,
+        slackBits:      pd.slack_bits != null ? String(pd.slack_bits) : '',
       });
     }
 

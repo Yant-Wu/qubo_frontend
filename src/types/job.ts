@@ -32,6 +32,8 @@ export interface JobDetail {
     selected_items?: Array<{ name: string; weight: number; value: number }>;
     total_value?: number;
     total_weight?: number;
+    n_slack?: number;            // knapsack slack variable 數量
+    slack_bits?: number;         // 使用者設定的 K（未設定時由後端自動推算）
   };
   history_data: HistoryDataPoint[];
   computation_time_ms?: number;  // 實際計算時間 (ms)
@@ -76,6 +78,7 @@ export interface CreateJobPayload {
     items?: Array<{ name: string; weight: number; value: number }>;
     capacity?: number;
     penalty?: number;
+    slack_bits?: number;
   };
 }
 
@@ -98,6 +101,7 @@ export interface QuboFormData {
   capacity: string;
   penalty: string;
   penaltyTouched: boolean;
+  slackBits: string;   // slack variable 數量 K（空字串 = 自動推算）
 }
 
 export const DEFAULT_QUBO_FORM: QuboFormData = {
@@ -105,6 +109,7 @@ export const DEFAULT_QUBO_FORM: QuboFormData = {
   capacity: '10',
   penalty: '0',
   penaltyTouched: false,
+  slackBits: '',
 };
 
 export interface KnapsackItem {
@@ -119,6 +124,10 @@ export interface KnapsackSolveRequest {
   penalty: number;
   problem_type: string;
   problem_data?: Record<string, unknown>;
+  /** custom 問題類型時直接傳入 Q_matrix */
+  Q_matrix?: number[][];
+  /** knapsack slack variable 數量 K（undefined = 自動推算）*/
+  slack_bits?: number;
 }
 
 export interface KnapsackSolveResponse {

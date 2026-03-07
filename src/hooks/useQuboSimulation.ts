@@ -25,9 +25,7 @@ export interface UseQuboSimulationReturn {
   handlePause: () => void;
 
   // 衍生計算值
-  numReads: number;
   iterCount: number;
-  progress: number;
 
   bestObjective: string;
   tts: string;
@@ -72,23 +70,12 @@ export function useQuboSimulation(
   const handlePause = useCallback(() => {}, []);
 
   // ── 衍生計算值 ─────────────────────────────────────────────────
-  // 實際 AEQTS 迭代次數：優先使用後端記錄的 t_end（= num_iterations），否則推算
-  const nVars = detail?.n_variables ?? 0;
-  const totalIterations = detail?.t_end != null
-    ? Math.round(detail.t_end)
-    : nVars > 0 ? Math.max(1000, nVars * 100) : 1000;
-
   // 目前從後端收到的最後一個迭代編號（history 將 iteration 儲存在 d.iteration）
   const lastIteration = simHistory.length > 0
     ? (simHistory[simHistory.length - 1].iteration ?? simHistory.length)
     : 0;
 
-  const iterCount = lastIteration;  // 實際 SA 迭代次數
-  const progress = isCompleted
-    ? 100
-    : iterCount > 0
-    ? Math.min(100, (iterCount / totalIterations) * 100)
-    : 0;
+  const iterCount = lastIteration;  // 實際 AEQTS 迭代次數
 
   // 最佳目標値（越大越好，如背包總價値）
   const bestObjective =
@@ -116,8 +103,7 @@ export function useQuboSimulation(
     paramCoolingRate, setParamCoolingRate,
     simHistory, isRunning, isCompleted,
     handleStart, handlePause,
-    numReads: totalIterations,
-    iterCount, progress,
+    iterCount,
     bestObjective, tts, feasiblePct,
   };
 }

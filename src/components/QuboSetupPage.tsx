@@ -22,6 +22,7 @@ export default function QuboSetupPage({
   const [capacity, setCapacity] = useState(initialFormData.capacity);
   const [penalty, setPenalty] = useState(initialFormData.penalty);
   const [penaltyTouched, setPenaltyTouched] = useState(initialFormData.penaltyTouched);
+  const [slackBits, setSlackBits] = useState(initialFormData.slackBits ?? '');
   const [localWarning, setLocalWarning] = useState<string | null>(null);
 
   // ── Knapsack items 輸入模式 ────────────────────────────
@@ -31,18 +32,49 @@ export default function QuboSetupPage({
   const [itemFileError, setItemFileError] = useState<string | null>(null);
   const itemFileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Custom Q_matrix 上傳 ──────────────────────────────
+  const [qMatrix, setQMatrix] = useState<number[][] | null>(null);
+  const [qMatrixError, setQMatrixError] = useState<string | null>(null);
+  const [qMatrixFileName, setQMatrixFileName] = useState('');
+  const qFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleQMatrixFileUpload = (file: File) => {
+    setQMatrixError(null);
+    setQMatrixFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = (e.target?.result as string).trim();
+        const raw = JSON.parse(text);
+        if (!Array.isArray(raw) || raw.length === 0)
+          throw new Error('Q_matrix 需為非空二維陣列 [[...], [...], ...]');
+        const n = raw.length;
+        for (let i = 0; i < n; i++) {
+          if (!Array.isArray(raw[i]))
+            throw new Error(`第 ${i} 行不是陣列`);
+          if ((raw[i] as unknown[]).length !== n)
+            throw new Error(`Q_matrix 不是方陣（第 ${i} 行長度 ${(raw[i] as unknown[]).length} ≠ ${n}）`);
+        }
+        setQMatrix(raw as number[][]);
+        setQMatrixError(null);
+      } catch (err) {
+        setQMatrix(null);
+        setQMatrixError(err instanceof Error ? err.message : '解析失敗，請確認格式');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // 任何欄位變更時通知 App 層保存
   useEffect(() => {
-    onFormChange({ items, capacity, penalty, penaltyTouched });
+    onFormChange({ items, capacity, penalty, penaltyTouched, slackBits });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, capacity, penalty, penaltyTouched]);
+  }, [items, capacity, penalty, penaltyTouched, slackBits]);
 
-  const totalValue = useMemo(
-    () => items.reduce((sum, item) => sum + (Number(item.value) > 0 ? Number(item.value) : 0), 0),
+  const recommendedPenalty = useMemo(
+    () => Number((Math.max(1, ...items.map((it) => (Number(it.value) > 0 ? Number(it.value) : 0)))).toFixed(2)),
     [items]
   );
-
-  const recommendedPenalty = useMemo(() => Number((totalValue * 0.75).toFixed(2)), [totalValue]);
 
   useEffect(() => {
     if (!penaltyTouched) {
@@ -50,8 +82,15 @@ export default function QuboSetupPage({
     }
   }, [recommendedPenalty, penaltyTouched]);
 
-  const addItem = () => {
-    setItems((prev) => [...prev, { name: `item-${prev.length + 1}`, weight: '', value: '' }]);
+  const [batchCount, setBatchCount] = useState('1');
+  const addBatchItems = () => {
+    const count = Math.max(1, Math.min(50, parseInt(batchCount, 10) || 1));
+    setItems((prev) => [
+      ...prev,
+      ...Array.from({ length: count }, (_, i) => ({
+        name: `item-${prev.length + i + 1}`, weight: '', value: '',
+      })),
+    ]);
   };
 
   const removeItem = (index: number) => {
@@ -79,6 +118,16 @@ export default function QuboSetupPage({
 
   const capacityNumber = Number(capacity);
   const penaltyNumber = Number(penalty);
+
+  // Slack variables：用於將不等式約束轉成等式， K = ceil(log2(C+1))
+  const slackInfo = useMemo(() => {
+    if (!Number.isFinite(capacityNumber) || capacityNumber <= 0) return null;
+    const autoK = Math.ceil(Math.log2(capacityNumber + 1));
+    const userK = slackBits !== '' ? parseInt(slackBits, 10) : null;
+    const K = (userK !== null && userK >= 1) ? userK : autoK;
+    const n = normalizedItems.length;
+    return { autoK, K, total: n + K };
+  }, [capacityNumber, normalizedItems.length, slackBits]);
 
   const invalidItemExists = normalizedItems.some(
     (item) => item.name === '' || item.weight <= 0 || item.value < 0 || Number.isNaN(item.weight) || Number.isNaN(item.value)
@@ -146,6 +195,23 @@ export default function QuboSetupPage({
   const handleSubmit = () => {
     setLocalWarning(null);
 
+    // ── custom 路徑 ──────────────────────────────────────
+    if (problemType === 'custom') {
+      if (!qMatrix) {
+        setLocalWarning('請上傳一個包含 Q_matrix 的 .txt 或 .json 檔案。');
+        return;
+      }
+      onSubmit({
+        items: [],
+        capacity: 0,
+        penalty: 0,
+        problem_type: problemType,
+        problem_data: problemData,
+        Q_matrix: qMatrix,
+      });
+      return;
+    }
+
     if (isItemsEmpty) {
       setLocalWarning('物品清單不可為空，請至少新增一個有效物品。');
       return;
@@ -167,6 +233,7 @@ export default function QuboSetupPage({
       items: normalizedItems,
       capacity: capacityNumber,
       penalty: penaltyNumber,
+      slack_bits: slackBits !== '' ? parseInt(slackBits, 10) : undefined,
       problem_type: problemType,
       problem_data: problemData,
     });
@@ -179,13 +246,82 @@ export default function QuboSetupPage({
         <div className="w-full max-w-5xl bg-gray-900 border border-gray-700/50 rounded-2xl shadow-2xl shadow-black/50 p-8">
           <div className="block">
 
+            {/* ══ CUSTOM Q_MATRIX 路徑 ════════════════════════════ */}
+            {problemType === 'custom' ? (
+              <div className="space-y-5">
+                <section className="space-y-3">
+                  <SectionTitle>上傳 Q_matrix 檔案</SectionTitle>
+                  <p className="text-xs text-gray-300"> 或 <span className="text-gray-300">.json</span>，內容為 JSON 二維方陣 <code className="text-indigo-300">{"[[...], [...], ...]"}</code>。
+                  </p>
+                  <div
+                    className="border-2 border-dashed border-gray-700 hover:border-indigo-500/60 rounded-xl p-8 text-center cursor-pointer transition-colors group"
+                    onClick={() => qFileInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleQMatrixFileUpload(f); }}
+                  >
+                    <Upload size={28} className="mx-auto mb-2 text-gray-600 group-hover:text-indigo-400 transition-colors" />
+                    <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">點擊或拖放 .txt / .json 到此處</p>
+                    {qMatrixFileName && <p className="mt-2 text-xs text-indigo-300 font-medium">{qMatrixFileName}</p>}
+                    <input
+                      ref={qFileInputRef}
+                      type="file"
+                      accept=".txt,.json"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleQMatrixFileUpload(f); e.target.value = ''; }}
+                    />
+                  </div>
+                  {qMatrixError && (
+                    <div className="text-rose-400 text-xs bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                      {qMatrixError}
+                    </div>
+                  )}
+                  {qMatrix && !qMatrixError && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3">
+                      <p className="text-xs text-emerald-300 font-semibold">✓ 已載入 {qMatrix.length} × {qMatrix.length} Q_matrix</p>
+                      <p className="text-xs text-gray-300 mt-1">對角線最小値：{Math.min(...qMatrix.map((row, i) => row[i])).toFixed(2)}</p>
+                    </div>
+                  )}
+                </section>
+
+                {localWarning && (
+                  <div className="text-amber-300 text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    {localWarning}
+                  </div>
+                )}
+                {error && (
+                  <div className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={onBack} className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-700/60 text-gray-400 hover:text-gray-200 hover:border-gray-600 text-sm transition-all">
+                    <ChevronLeft size={16} />
+                    上一步
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || !qMatrix}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/30"
+                  >
+                    {isSubmitting ? (
+                      <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />提交中…</>
+                    ) : (
+                      <>開始求解<ChevronRight size={16} /></>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+            /* ══ KNAPSACK 路徑（原本內容）══════════════════════════ */
+            <>
             {/* ── LEFT PANEL ──────────────────────────────────── */}
             <div className="space-y-5">
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <SectionTitle>物品清單（items）</SectionTitle>
                     {/* 輸入模式切換 */}
-                    <div className="flex rounded-lg overflow-hidden border border-gray-700/60 text-xs">
+                    <div className="flex rounded-lg overflow-hidden border border-gray-700/60 text-sm">
                       <button
                         onClick={() => setItemInputMode('manual')}
                         className={`px-3 py-1.5 transition-colors ${itemInputMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-800/60 text-gray-400 hover:text-gray-200'}`}
@@ -203,13 +339,19 @@ export default function QuboSetupPage({
 
                   {itemInputMode === 'manual' ? (
                     <>
-                      <div className="flex justify-end">
+                      <div className="flex items-center gap-2 justify-end">
+                        <span className="text-sm text-gray-300">一次新增</span>
+                        <input
+                          type="number" min={1} max={50} value={batchCount}
+                          onChange={(e) => setBatchCount(e.target.value)}
+                          className="w-16 bg-gray-700/60 border border-gray-600/50 rounded px-2 py-1 text-sm text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+                        />
                         <button
-                          onClick={addItem}
+                          onClick={addBatchItems}
                           className="flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                         >
                           <Plus size={14} />
-                          新增物品
+                          個物品
                         </button>
                       </div>
                       <div className="space-y-2 max-h-72 overflow-y-auto pr-1.5">
@@ -235,7 +377,7 @@ export default function QuboSetupPage({
                       >
                         <Upload size={24} className="mx-auto mb-2 text-gray-600 group-hover:text-indigo-400 transition-colors" />
                         <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">點擊或拖放檔案到此處</p>
-                        <p className="text-xs text-gray-600 mt-1">支援 CSV（需含 name,weight,value 欄位）或 JSON</p>
+                        <p className="text-xs text-gray-400 mt-1">支援 CSV（需含 name,weight,value 欄位）或 JSON</p>
                         {itemFileName && <p className="mt-2 text-xs text-indigo-300 font-medium">{itemFileName}</p>}
                         <input
                           ref={itemFileInputRef}
@@ -255,11 +397,11 @@ export default function QuboSetupPage({
                           <p className="text-xs text-indigo-300 font-semibold">✓ 已載入 {items.length} 個物品</p>
                           <div className="max-h-40 overflow-y-auto space-y-1 mt-1">
                             {items.slice(0, 5).map((item, i) => (
-                              <p key={i} className="text-xs text-gray-400 font-mono">
+                              <p key={i} className="text-xs text-gray-200 font-mono">
                                 {item.name} &nbsp;·&nbsp; w: {item.weight} &nbsp;·&nbsp; v: {item.value}
                               </p>
                             ))}
-                            {items.length > 5 && <p className="text-xs text-gray-600">…還有 {items.length - 5} 個</p>}
+                            {items.length > 5 && <p className="text-xs text-gray-400">…還有 {items.length - 5} 個</p>}
                           </div>
                         </div>
                       )}
@@ -275,18 +417,38 @@ export default function QuboSetupPage({
                   <SectionTitle>容量與懲罰係數</SectionTitle>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs text-gray-400 uppercase tracking-wider">capacity</label>
+                      <label className="text-sm text-gray-100 uppercase tracking-wider">capacity</label>
                       <input type="number" min={0} step="any" value={capacity} onChange={(e) => setCapacity(e.target.value)} className={inputCls} />
                       {isCapacityInvalid && <p className="text-amber-300 text-xs">capacity 需大於 0</p>}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-gray-400 uppercase tracking-wider">penalty</label>
+                      <label className="text-sm text-gray-100 uppercase tracking-wider">penalty</label>
                       <input type="number" min={0} step="any" value={penalty} onChange={(e) => { setPenalty(e.target.value); setPenaltyTouched(true); }} className={inputCls} />
                       {isPenaltyInvalid && <p className="text-amber-300 text-xs">penalty 需大於 0</p>}
                     </div>
                   </div>
-                  <div className="rounded-lg border border-gray-800/80 bg-gray-950/40 px-3 py-2 text-xs text-gray-400">
-                    建議 penalty（75% × items 總 value）= <span className="text-indigo-300 font-semibold">{recommendedPenalty}</span>
+                  <div className="rounded-lg border border-gray-800/80 bg-gray-950/40 px-3 py-2 text-sm text-gray-200 space-y-1">
+                    <div>建議 penalty（≈ 單一物品最大 value）= <span className="text-indigo-300 font-semibold">{recommendedPenalty}</span></div>
+                    {slackInfo && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span>Slack bits K：</span>
+                          <input
+                            type="number" min={1} step={1}
+                            value={slackBits}
+                            placeholder={String(slackInfo.autoK)}
+                            onChange={(e) => setSlackBits(e.target.value)}
+                            className="w-16 bg-gray-700/60 border border-gray-600/50 rounded px-2 py-0.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+                          />
+                          <span className="text-gray-300">（自動建議：{slackInfo.autoK}）</span>
+                        </div>
+                        {normalizedItems.length > 0 && (
+                          <div className="text-gray-300">
+                            QUBO 維度：{normalizedItems.length} items + {slackInfo.K} slack = <span className="text-emerald-400 font-semibold">{slackInfo.total}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>
@@ -332,6 +494,8 @@ export default function QuboSetupPage({
                 </button>
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -341,10 +505,10 @@ export default function QuboSetupPage({
 
 // ── 小元件 ────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{children}</h3>;
+  return <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-widest">{children}</h3>;
 }
 
 const inputCls =
-  'bg-gray-800/60 border border-gray-700/50 rounded-lg px-3.5 py-2 text-sm text-gray-100 w-full ' +
+  'bg-gray-800/60 border border-gray-700/50 rounded-lg px-3.5 py-2.5 text-base text-gray-100 w-full ' +
   'placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition-colors';
 

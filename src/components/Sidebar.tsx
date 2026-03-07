@@ -33,7 +33,7 @@ export default function Sidebar({
         flex-shrink-0 flex flex-col h-full
         bg-gray-900 border-r border-gray-800/50
         transition-[width] duration-300 ease-in-out overflow-hidden
-        ${isOpen ? 'w-60' : 'w-[60px]'}
+        ${isOpen ? 'w-64' : 'w-[60px]'}
       `}
     >
       {/* ── 第一行：漢堡選單（+ 展開時顯示標題） ── */}
@@ -47,7 +47,7 @@ export default function Sidebar({
           <Menu size={20} />
         </button>
         {isOpen && (
-          <span className="ml-3 text-base font-medium text-gray-200 whitespace-nowrap tracking-tight select-none">
+          <span className="ml-3 text-base font-medium text-white whitespace-nowrap tracking-tight select-none">
             QUBO Dashboard
           </span>
         )}
@@ -64,7 +64,7 @@ export default function Sidebar({
           <SquarePen size={20} />
         </button>
         {isOpen && (
-          <span className="ml-3 text-sm text-gray-400 whitespace-nowrap select-none">
+          <span className="ml-3 text-sm text-gray-200 whitespace-nowrap select-none">
             新任務
           </span>
         )}
@@ -75,7 +75,7 @@ export default function Sidebar({
 
       {/* ── 歷史標題（展開時） ── */}
       {isOpen && (
-        <p className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">
+        <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-widest text-gray-300">
           歷史紀錄
         </p>
       )}
@@ -90,7 +90,7 @@ export default function Sidebar({
           <p className="text-center text-rose-400/80 text-xs py-6 px-2">{error}</p>
         ) : jobList.length === 0 ? (
           isOpen ? (
-            <p className="text-center text-gray-600 text-xs py-6">尚無任務</p>
+            <p className="text-center text-gray-400 text-xs py-6">尚無任務</p>
           ) : null
         ) : isOpen ? (
           <div className="px-2 space-y-0.5">

@@ -3,7 +3,7 @@ import { request } from './apiClient';
 import type { JobItem, JobDetail, ApiResponse, CreateJobPayload } from '../types/job';
 
 /** 取得任務列表 */
-export async function fetchJobs(_algorithm?: string): Promise<JobItem[]> {
+export async function fetchJobs(): Promise<JobItem[]> {
   const result = await request<ApiResponse<JobItem[]>>('/api/jobs');
   return Array.isArray(result.data) ? result.data : [];
 }
