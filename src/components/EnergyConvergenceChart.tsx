@@ -16,17 +16,18 @@ export default function EnergyConvergenceChart({ history, compact = false }: Pro
     backgroundColor: 'transparent',
     grid: compact
       ? { top: 6, right: 6, bottom: 6, left: 6 }
-      : { top: 36, right: hasQE ? 70 : 16, bottom: 40, left: 60 },
+      : { top: 45, right: hasQE ? 70 : 20, bottom: 40, left: 65 }, // 💡 增加邊距避免字體重疊
     legend: compact ? undefined : hasQE ? {
-      top: 6,
-      textStyle: { color: '#e5e7eb', fontSize: 15 },
+      top: 0,
+      right: hasQE ? 70 : 20, // 💡 圖例往右推
+      textStyle: { color: '#e5e7eb', fontSize: 13 },
       itemWidth: 16,
       itemHeight: 10,
       tooltip: {
         show: true,
         backgroundColor: '#1f2937',
         borderColor: '#374151',
-        textStyle: { color: '#e5e7eb', fontSize: 15 },
+        textStyle: { color: '#e5e7eb', fontSize: 13 },
         formatter: (params: { name: string }) => {
           if (params.name === 'Best Objective')
             return '歷史最佳解的總價值<br/>只增不減，最右端即為最終答案';
@@ -39,10 +40,10 @@ export default function EnergyConvergenceChart({ history, compact = false }: Pro
     xAxis: {
       type: 'value',
       name: compact ? '' : 'Iteration',
-      nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
+      nameTextStyle: { color: '#e5e7eb', fontSize: 13 },
       axisLine: { lineStyle: { color: '#374151' } },
       axisTick: { show: !compact, lineStyle: { color: '#374151' } },
-      axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
+      axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 13 },
       splitLine: { lineStyle: { color: '#1f2937' } },
       min: 1,
       max: history[history.length - 1]?.iteration ?? 1,
@@ -51,75 +52,50 @@ export default function EnergyConvergenceChart({ history, compact = false }: Pro
       {
         type: 'value',
         name: compact ? '' : 'Best Value',
-        nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
+        nameTextStyle: { color: '#e5e7eb', fontSize: 13, align: 'left' },
         axisLine: { lineStyle: { color: '#374151' } },
         axisTick: { show: !compact, lineStyle: { color: '#374151' } },
-        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
+        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 13 },
         splitLine: { lineStyle: { color: '#1f2937' } },
       },
       hasQE ? {
         type: 'value',
         name: compact ? '' : 'QUBO Energy',
-        nameTextStyle: { color: '#e5e7eb', fontSize: 15 },
+        nameTextStyle: { color: '#e5e7eb', fontSize: 13, align: 'right' },
         axisLine: { lineStyle: { color: '#374151' } },
         axisTick: { show: !compact, lineStyle: { color: '#374151' } },
-        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 15 },
+        axisLabel: { show: !compact, color: '#e5e7eb', fontSize: 13 },
         splitLine: { show: false },
       } : undefined,
     ].filter(Boolean),
     tooltip: compact ? { show: false } : {
       trigger: 'axis',
-      axisPointer: {
-        type: 'line',
-        snap: true,
-        lineStyle: { color: '#6b7280', type: 'dashed', width: 1 },
-      },
+      axisPointer: { type: 'line', snap: true, lineStyle: { color: '#6b7280', type: 'dashed', width: 1 } },
       backgroundColor: '#1f2937',
       borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 15 },
+      textStyle: { color: '#e5e7eb', fontSize: 14 },
       formatter: (params: { seriesName: string; value: number[] }[]) =>
-        params
-          .map((p) => `${p.seriesName}: <b>${p.value[1].toFixed(4)}</b>`)
-          .join('<br/>') + `<br/><span style="color:#6b7280">Iter ${params[0]?.value[0]}</span>`,
+        params.map((p) => `${p.seriesName}: <b>${p.value[1].toFixed(4)}</b>`).join('<br/>') + 
+        `<br/><span style="color:#6b7280">Iter ${params[0]?.value[0]}</span>`,
     },
     series: [
       {
-        name: 'Best Objective',
-        type: 'line',
-        yAxisIndex: 0,
+        name: 'Best Objective', type: 'line', yAxisIndex: 0,
         data: history.map((d) => [d.iteration, d.value]),
-        symbol: 'none',
-        lineStyle: { color: '#34d399', width: 2 },
+        symbol: 'none', lineStyle: { color: '#34d399', width: 2 },
         areaStyle: {
-          color: {
-            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(52,211,153,0.25)' },
-              { offset: 1, color: 'rgba(52,211,153,0.00)' },
-            ],
-          },
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(52,211,153,0.25)' }, { offset: 1, color: 'rgba(52,211,153,0.00)' }] }
         },
         smooth: 0.3,
       },
       ...(hasQE ? [{
-        name: 'QUBO Energy',
-        type: 'line',
-        yAxisIndex: 1,
-        data: history
-          .filter((d) => d.qubo_energy != null)
-          .map((d) => [d.iteration, d.qubo_energy as number]),
-        symbol: 'none',
-        lineStyle: { color: '#818cf8', width: 1.5, type: 'dashed' },
+        name: 'QUBO Energy', type: 'line', yAxisIndex: 1,
+        data: history.filter((d) => d.qubo_energy != null).map((d) => [d.iteration, d.qubo_energy as number]),
+        symbol: 'none', lineStyle: { color: '#818cf8', width: 1.5, type: 'dashed' },
         smooth: 0.3,
       }] : []),
     ],
   };
 
-  return (
-    <ReactECharts
-      option={option}
-      style={{ width: '100%', height: '100%' }}
-      opts={{ renderer: 'canvas' }}
-    />
-  );
+  return <ReactECharts option={option} style={{ width: '100%', height: '100%' }} opts={{ renderer: 'canvas' }} />;
 }

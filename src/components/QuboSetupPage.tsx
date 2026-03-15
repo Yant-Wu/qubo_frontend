@@ -435,7 +435,7 @@ export default function QuboSetupPage({
                           <span>Slack bits K：</span>
                           <input
                             type="number" min={1} step={1}
-                            value={slackBits}
+                            value={slackBits === '' ? 0 : slackBits}
                             placeholder={String(slackInfo.autoK)}
                             onChange={(e) => setSlackBits(e.target.value)}
                             className="w-16 bg-gray-700/60 border border-gray-600/50 rounded px-2 py-0.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500/60"

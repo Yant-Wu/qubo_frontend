@@ -1,11 +1,12 @@
 // src/components/QuboMonitorPanel.tsx — 監控儀錶板：歷史任務狀態跟蹤
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { Download, Play, ArrowLeftRight } from 'lucide-react';
+import { Download, Play } from 'lucide-react';
 import type { JobDetail, SimParams } from '../types/job';
 import type { KnapsackSolveResponse } from '../types/job';
 import { useQuboSimulation } from '../hooks/useQuboSimulation';
 import EnergyConvergenceChart from './EnergyConvergenceChart';
 import EntropyChart from './EntropyChart';
+import QubitProbChart from './QubitProbChart';
 
 interface Props {
   jobId: string | number | null;
@@ -57,7 +58,6 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
     bestObjective, tts, feasiblePct,
   } = useQuboSimulation(jobId, detail, simParams);
 
-  // 優先使用 jobDetail 裡儲存的結果（刷新後也存在），其次才用 solveResult這次小時的記憶
   const pd = detail?.problem_data;
   const displaySelected: Array<{ name: string; weight: number; value: number }> =
     (pd?.selected_items && pd.selected_items.length > 0)
@@ -65,11 +65,10 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
       : (solveResult?.selected_items ?? []);
   const displayTotalValue  = pd?.total_value  ?? solveResult?.total_value;
   const displayTotalWeight = pd?.total_weight ?? solveResult?.total_weight;
-  const displayTimeMs = solveResult?.computation_time_ms ?? detail?.computation_time_ms;
+  const displayTimeMs = solveResult?.computation_time_ms || detail?.computation_time_ms;
 
-  // 圖表交換狀態
-  const [chartsSwapped, setChartsSwapped] = useState(false);
-
+  // 狀態簡化為「綜合視圖」與「亂度下降」
+  const [chartMode, setChartMode] = useState<'main' | 'entropy'>('main');
 
   // 匯出 01 字串
   const handleExport = () => {
@@ -87,7 +86,6 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
     URL.revokeObjectURL(url);
   };
 
-  // ── 載入中 / 錯誤狀態（優先顯示，避免黑屏） ───────────────────
   if (isLoading && detail === null) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-950">
@@ -105,162 +103,81 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
         <div className="text-center space-y-3 max-w-sm px-6">
           <p className="text-rose-400 text-sm font-semibold">無法載入任務</p>
           <p className="text-gray-300 text-xs">{loadError}</p>
-          <button
-            onClick={onStop}
-            className="mt-2 text-xs text-gray-500 hover:text-gray-300 underline transition-colors"
-          >
-            ← 返回首頁
-          </button>
+          <button onClick={onStop} className="mt-2 text-xs text-gray-500 hover:text-gray-300 underline transition-colors">← 返回首頁</button>
         </div>
       </div>
     );
   }
 
-  // ── Status ──────────────────────────────────────────────────────
   const backendStatus = detail?.status;
   const statusLabel = backendStatus ?? (isRunning ? 'running' : isCompleted ? 'completed' : 'idle');
-  const statusColor = statusLabel === 'running'
-    ? 'bg-emerald-900/40 text-emerald-400'
-    : statusLabel === 'completed'
-    ? 'bg-indigo-900/40 text-indigo-300'
-    : 'bg-gray-800/60 text-gray-500';
-  const dotColor = statusLabel === 'running'
-    ? 'bg-emerald-400 animate-pulse'
-    : statusLabel === 'completed'
-    ? 'bg-indigo-400'
-    : 'bg-gray-600';
+  const statusColor = statusLabel === 'running' ? 'bg-emerald-900/40 text-emerald-400' : statusLabel === 'completed' ? 'bg-indigo-900/40 text-indigo-300' : 'bg-gray-800/60 text-gray-500';
+  const dotColor = statusLabel === 'running' ? 'bg-emerald-400 animate-pulse' : statusLabel === 'completed' ? 'bg-indigo-400' : 'bg-gray-600';
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* ── 主體：左側 + 右側圖表 ──────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* ── 左側面板 ─────────────────────────────────────────────── */}
         <aside className="w-72 flex-shrink-0 flex flex-col gap-3 p-4 border-r border-gray-800/60 bg-gray-900/40 overflow-y-auto">
 
-          {/* 求解參數（只讀） */}
+          {/* 求解參數 */}
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-1.5">
-            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider mb-2">
-              此次參數紀錄
-            </p>
-            {/* ── 任務基本資訊 ── */}
-            <ReadRow label="Task Name"     value={detail?.task_name ?? '—'} />
-            <ReadRow label="Problem Type"  value={detail?.problem_type ?? '—'} />
-            <ReadRow
-              label="Generation"
-              value={
-                detail?.problem_type === 'custom'
-                  ? `custom (${detail?.n_variables ?? '?'}×${detail?.n_variables ?? '?'})`
-                  : (detail?.problem_data?.generation_method ?? '—')
-              }
-            />
+            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider mb-2">此次參數紀錄</p>
+            <ReadRow label="Task Name" value={detail?.task_name ?? '—'} />
+            <ReadRow label="Problem Type" value={detail?.problem_type ?? '—'} />
+            <ReadRow label="Generation" value={detail?.problem_type === 'custom' ? `custom (${detail?.n_variables ?? '?'}×${detail?.n_variables ?? '?'})` : (detail?.problem_data?.generation_method ?? '—')} />
             {detail?.problem_data?.generation_method === 'random' && detail?.problem_data?.seed !== undefined && (
               <ReadRow label="Seed" value={String(detail.problem_data.seed)} />
             )}
-            {/* ── 分隔線 ── */}
             <div className="border-t border-gray-700/40 my-1" />
-            {/* ── 求解參數 ── */}
             <ReadRow
               label="Variables"
               value={(() => {
                 const nSlack = detail?.problem_data?.n_slack as number | undefined;
                 const total = detail?.n_variables;
-                if (nSlack && nSlack > 0 && total != null) {
-                  const nItems = total - nSlack;
-                  return `${nItems} items + ${nSlack} slack = ${total}`;
-                }
+                if (nSlack && nSlack > 0 && total != null) return `${total - nSlack} items + ${nSlack} slack = ${total}`;
                 return String(total ?? '—');
               })()}
             />
-            <ReadRow label="Timeout"       value={paramTimeout ? `${paramTimeout} s` : '—'} />
+            <ReadRow label="Timeout" value={paramTimeout ? `${paramTimeout} s` : '—'} />
             <ReadRow label="Neighbors (N)" value={paramInitTemp} />
-            <ReadRow label="Iterations"    value={paramCoolingRate} />
-            {/* ── GPU/CPU 裝置桜── */}
+            <ReadRow label="Iterations" value={paramCoolingRate} />
             {detail?.compute_device && (
               <>
                 <div className="border-t border-gray-700/40 my-1" />
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-200">Compute</span>
                   {detail.compute_device === 'gpu' || detail.compute_device === 'cuda' ? (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold
-                                    bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
-                      ⚡ GPU
-                    </span>
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">⚡ GPU</span>
                   ) : (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold
-                                    bg-gray-700/50 text-gray-400 border border-gray-600/50">
-                      ■ CPU
-                    </span>
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gray-700/50 text-gray-400 border border-gray-600/50">■ CPU</span>
                   )}
                 </div>
               </>
             )}
           </div>
 
-          {/* 最佳化指標（大字 + 閃爍） */}
+          {/* 最佳化結果 */}
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-4">
-            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
-              最佳化結果
-            </p>
-            <MetricBlock label="Best Objective">
-              <FlickerValue value={bestObjective} xl />
-            </MetricBlock>
-            <MetricBlock label="TTS">
-              <FlickerValue value={tts} large />
-            </MetricBlock>
-            <MetricBlock label="Feasible Solutions">
-              <FlickerValue value={feasiblePct !== '—' ? `${feasiblePct} %` : '—'} large />
-            </MetricBlock>
+            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">最佳化結果</p>
+            <MetricBlock label="Best Objective"><FlickerValue value={bestObjective} xl /></MetricBlock>
+            <MetricBlock label="TTS"><FlickerValue value={tts} large /></MetricBlock>
+            <MetricBlock label="Feasible Solutions"><FlickerValue value={feasiblePct !== '—' ? `${feasiblePct} %` : '—'} large /></MetricBlock>
             {solveResult && (
-              <>
-                <div className="border-t border-gray-700/40 pt-1 space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-200">Total Value</span>
-                    <span className="font-mono text-emerald-300 font-semibold">{displayTotalValue ?? '—'}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-200">Total Weight</span>
-                    <span className="font-mono text-indigo-300 font-semibold">{displayTotalWeight ?? '—'}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-200">Time</span>
-                    <span className="font-mono text-gray-300">{displayTimeMs != null ? `${displayTimeMs} ms` : '—'}</span>
-                  </div>
-                </div>
-              </>
+              <div className="border-t border-gray-700/40 pt-1 space-y-1">
+                <div className="flex justify-between text-xs"><span className="text-gray-200">Total Value</span><span className="font-mono text-emerald-300 font-semibold">{displayTotalValue ?? '—'}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-gray-200">Total Weight</span><span className="font-mono text-indigo-300 font-semibold">{displayTotalWeight ?? '—'}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-gray-200">Time</span><span className="font-mono text-gray-300">{displayTimeMs != null ? `${displayTimeMs} ms` : '—'}</span></div>
+              </div>
             )}
           </div>
 
-          {/* Entropy 圖（左側小型顯示） */}
-          {simHistory.some((d) => d.entropy != null) && (
-            <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-2 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
-                  {chartsSwapped ? 'Convergence' : 'Q-bit Entropy'}
-                </p>
-                <button
-                  onClick={() => setChartsSwapped((s) => !s)}
-                  title="與主圖表交換"
-                  className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
-                >
-                  <ArrowLeftRight size={13} />
-                </button>
-              </div>
-              <div className="h-32">
-                {chartsSwapped
-                  ? <EnergyConvergenceChart history={simHistory} compact />
-                  : <EntropyChart history={simHistory} compact />}
-              </div>
-            </div>
-          )}
-
           {/* 選中物品清單 */}
           {displaySelected.length > 0 && (
-            <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-2">
-              <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
-                Selected Items ({displaySelected.length})
-              </p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+            <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-2 flex-1 min-h-0 flex flex-col">
+              <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider flex-shrink-0">Selected Items ({displaySelected.length})</p>
+              <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1">
                 {displaySelected.map((item, i) => (
                   <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-gray-900/60 border border-gray-700/30 px-2.5 py-1.5">
                     <span className="text-xs text-gray-100 font-medium truncate flex-1">{item.name}</span>
@@ -272,114 +189,102 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             </div>
           )}
 
-          <div className="flex-1" />
-
-          {statusLabel === 'running' && (
-            <div className="text-center text-xs text-emerald-300 font-medium py-1">後端運算中…</div>
-          )}
-          {statusLabel === 'completed' && (
-            <div className="text-center text-xs text-indigo-300 font-medium py-1">✓ 後端回傳完成</div>
-          )}
-          {statusLabel !== 'running' && statusLabel !== 'completed' && (
-            <div className="text-center text-xs text-gray-300 font-medium py-1">等待後端排程</div>
-          )}
-
-          {/* 套用此設定重新執行 */}
+          {statusLabel === 'running' && <div className="text-center text-xs text-emerald-300 font-medium py-1">後端運算中…</div>}
+          {statusLabel === 'completed' && <div className="text-center text-xs text-indigo-300 font-medium py-1">✓ 後端回傳完成</div>}
+          
           {onReuseSettings && (
-            <button
-              onClick={onReuseSettings}
-              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors border border-indigo-700/40">
+            <button onClick={onReuseSettings} className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors border border-indigo-700/40">
               ↺ 套用此設定重新執行
             </button>
           )}
-          <button
-            onClick={() => { handlePause(); onStop(); }}
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-gray-500 hover:text-rose-400 text-xs transition-colors">
+          <button onClick={() => { handlePause(); onStop(); }} className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-gray-500 hover:text-rose-400 text-xs transition-colors">
             ← 離開並刪除任務
           </button>
         </aside>
 
         {/* ── 右側：圖表區 ───────────────────────────────────────── */}
         <div className="flex-1 flex flex-col overflow-hidden p-4 gap-3">
-          {/* 頂部標題列 */}
+          
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-base font-semibold text-gray-200">Qubit Probability Monitor</span>
-            {detail?.task_name && (
-              <span className="text-xs text-gray-300 truncate">— {detail.task_name}</span>
-            )}
+            {detail?.task_name && <span className="text-xs text-gray-300 truncate">— {detail.task_name}</span>}
             <span className={`ml-auto flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full ${statusColor}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-              {statusLabel}
+              <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />{statusLabel}
             </span>
             {statusLabel === 'completed' && (
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 hover:text-emerald-100 text-sm font-medium transition-colors border border-emerald-700/40"
-              >
-                <Download size={14} />
-                匯出 01 字串
+              <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 hover:text-emerald-100 text-sm font-medium transition-colors border border-emerald-700/40">
+                <Download size={14} />匯出 01 字串
               </button>
             )}
           </div>
 
-          {/* 主圖表 */}
           {!isRunning && !isCompleted && iterCount === 0 ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-4">
                 {isSolving ? (
-                  <>
-                    <div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" />
-                    <div>
-                      <p className="text-gray-300 text-sm font-medium">後端運算中…</p>
-                      <p className="text-gray-600 text-xs mt-1">AEQTS 正在求解，請稍候</p>
-                    </div>
-                  </>
+                  <><div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" /><div><p className="text-gray-300 text-sm font-medium">後端運算中…</p><p className="text-gray-600 text-xs mt-1">AEQTS 正在求解，請稍候</p></div></>
                 ) : (
-                  <>
-                    <div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto">
-                      <Play size={28} className="text-indigo-400 ml-1" />
-                    </div>
-                    <div>
-                      <p className="text-gray-300 text-sm font-medium">等待資料</p>
-                      <p className="text-gray-600 text-xs mt-1">
-                        {detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}
-                      </p>
-                    </div>
-                  </>
+                  <><div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto"><Play size={28} className="text-indigo-400 ml-1" /></div><div><p className="text-gray-300 text-sm font-medium">等待資料</p><p className="text-gray-600 text-xs mt-1">{detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}</p></div></>
                 )}
               </div>
             </div>
           ) : (
-            <div className="flex-1 bg-gray-800/30 border border-gray-700/40 rounded-xl overflow-hidden min-h-0">
-              {chartsSwapped
-                ? <EntropyChart history={simHistory} />
-                : <EnergyConvergenceChart history={simHistory} />}
+            <div className="flex-1 flex flex-col bg-gray-800/30 border border-gray-700/40 rounded-xl overflow-hidden min-h-0">
+              
+              {/* 💡 按鈕區塊 */}
+              <div className="flex items-center gap-2 p-3 border-b border-gray-700/50 bg-gray-900/50 flex-shrink-0">
+                <button
+                  onClick={() => setChartMode('main')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${chartMode === 'main' ? 'bg-indigo-600 text-white shadow' : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}`}
+                >
+                  綜合視圖 (Convergence & Q-bits)
+                </button>
+                <button
+                  onClick={() => setChartMode('entropy')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${chartMode === 'entropy' ? 'bg-indigo-600 text-white shadow' : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}`}
+                >
+                  系統平均熵 (Entropy)
+                </button>
+              </div>
+
+              {/* 💡 Flex 動態排版圖表渲染區 */}
+              <div className="flex-1 overflow-hidden relative">
+                {chartMode === 'main' && (
+                  <div className="absolute inset-0 flex flex-col">
+                    {/* 上半部：收斂曲線 (佔 45%) */}
+                    <div className="flex-[45] flex flex-col min-h-0 border-b border-gray-700/50 pt-2">
+                      <div className="px-4 pb-1 text-xs font-semibold text-gray-400 tracking-wider flex-shrink-0">
+                        最佳價值與能量收斂
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <EnergyConvergenceChart history={simHistory} />
+                      </div>
+                    </div>
+                    {/* 下半部：Q-bit 機率網格 (佔 55%) */}
+                    <div className="flex-[55] flex flex-col min-h-0 bg-gray-900/20 pt-2">
+                      <div className="px-4 pb-1 text-xs font-semibold text-gray-400 tracking-wider flex-shrink-0">
+                        Q-bit 量子態坍縮機率
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <QubitProbChart history={simHistory} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {chartMode === 'entropy' && <EntropyChart history={simHistory} />}
+              </div>
+
             </div>
           )}
         </div>
       </div>
-
-
     </div>
   );
 }
 
-// ── 只讀參數列 ─────────────────────────────────────────────────────
 function ReadRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-sm text-white">{label}</span>
-      <span className="text-sm font-mono text-indigo-300">{value}</span>
-    </div>
-  );
+  return <div className="flex items-center justify-between gap-2"><span className="text-sm text-white">{label}</span><span className="text-sm font-mono text-indigo-300">{value}</span></div>;
 }
-
-// ── 大字指標區塊 ───────────────────────────────────────────────────
 function MetricBlock({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-200 uppercase tracking-wider">{label}</span>
-      {children}
-    </div>
-  );
+  return <div className="flex flex-col gap-0.5"><span className="text-xs text-gray-200 uppercase tracking-wider">{label}</span>{children}</div>;
 }
