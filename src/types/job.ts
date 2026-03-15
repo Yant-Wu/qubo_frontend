@@ -49,6 +49,7 @@ export interface HistoryDataPoint {
   value: number;
   qubo_energy?: number | null;    // 當前迭代的 QUBO 能量（每次都會變）
   entropy?: number | null;        // AEQTS Q-bit entropy（0=完全收斂，1=最大不確定）
+  qubit_probs?: number[];
   is_feasible?: boolean | null;
   [key: string]: unknown;
 }

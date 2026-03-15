@@ -78,10 +78,13 @@ export function useQuboSimulation(
   const iterCount = lastIteration;  // 實際 AEQTS 迭代次數
 
   // 最佳目標値（越大越好，如背包總價値）
-  const bestObjective =
-    iterCount > 0
-      ? Math.max(...simHistory.map((d) => d.value)).toFixed(4)
-      : '—';
+  // 優先取可行解中的最大值；若無可行解記錄（舊資料），退回所有歷史的最大值
+  const bestObjective = (() => {
+    if (iterCount === 0) return '—';
+    const feasible = simHistory.filter((d) => d.is_feasible === true);
+    const source = feasible.length > 0 ? feasible : simHistory;
+    return Math.max(...source.map((d) => d.value)).toFixed(4);
+  })();
 
   // TTS = 後端實際計算時間
   const tts = detail?.computation_time_ms != null

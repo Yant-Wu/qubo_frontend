@@ -21,7 +21,8 @@ export function useJobDetail(activeId: string | number | null): UseJobDetailRetu
       return;
     }
 
-    setIsLoading(true);
+    // 💡 輪詢時不需要每次都顯示 Loading 動畫，否則畫面會閃爍
+    // setIsLoading(true); // 拔除這行以保持畫面順暢
     setError(null);
     try {
       const data = await fetchJobDetail(activeId);
@@ -44,7 +45,7 @@ export function useJobDetail(activeId: string | number | null): UseJobDetailRetu
     if (activeId == null) return;
     const timer = setInterval(() => {
       void load();
-    }, 3000);
+    }, 1000); // 💡 將頻率提升為每 1 秒更新一次，讓曲線動起來
     return () => clearInterval(timer);
   }, [activeId, load]);
 
