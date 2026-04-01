@@ -1,6 +1,6 @@
 // src/hooks/useQuboSimulation.ts — QUBO 模擬狀態管理 Hook
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { JobDetail, SimParams } from '../types/job';
 import type { HistoryDataPoint } from '../types/job';
 
@@ -9,11 +9,8 @@ type SimPoint = HistoryDataPoint;
 export interface UseQuboSimulationReturn {
   // 可編輯參數
   paramTimeout: string;
-  setParamTimeout: (v: string) => void;
   paramInitTemp: string;
-  setParamInitTemp: (v: string) => void;
   paramCoolingRate: string;
-  setParamCoolingRate: (v: string) => void;
 
   // 模擬狀態
   simHistory: SimPoint[];
@@ -21,7 +18,6 @@ export interface UseQuboSimulationReturn {
   isCompleted: boolean;
 
   // 操作
-  handleStart: () => void;
   handlePause: () => void;
 
   // 衍生計算值
@@ -37,34 +33,19 @@ export function useQuboSimulation(
   detail: JobDetail | null,
   externalSimParams?: SimParams
 ): UseQuboSimulationReturn {
-  const backendHistory = detail?.history_data ?? [];
-  const backendStatus = detail?.status ?? 'pending';
+  void jobId;
+  // ── 可編輯參數（由外部資料推導）─────────────────────────────────
+  const paramTimeout = externalSimParams?.timeout ?? String(detail?.problem_data?.timeout_seconds ?? 30);
+  // t_start 儲存 AEQTS 鄰域大小 N；t_end 儲存實際迭代次數
+  const N = detail?.t_start ?? 50;
+  const numIter = detail?.t_end ?? Math.max(1000, (detail?.n_variables ?? 0) * 100);
+  const paramInitTemp = externalSimParams?.initTemp ?? String(Math.round(N));
+  const paramCoolingRate = externalSimParams?.coolingRate ?? String(Math.round(numIter));
 
-  // ── 可編輯參數 ─────────────────────────────────────────────────
-  const [paramTimeout, setParamTimeout] = useState<string>(externalSimParams?.timeout ?? '30');
-  const [paramInitTemp, setParamInitTemp] = useState<string>(externalSimParams?.initTemp ?? '50');
-  const [paramCoolingRate, setParamCoolingRate] = useState<string>(externalSimParams?.coolingRate ?? '1000');
-
-  // ── 模擬狀態 ───────────────────────────────────────────────────
-  const [simHistory, setSimHistory] = useState<SimPoint[]>(backendHistory);
-  const [isRunning, setIsRunning] = useState<boolean>(backendStatus === 'running');
-  const [isCompleted, setIsCompleted] = useState<boolean>(backendStatus === 'completed');
-
-  // ── jobId/detail 切換時改以後端資料為準 ───────────────────────
-  useEffect(() => {
-    setParamTimeout(externalSimParams?.timeout ?? String(detail?.problem_data?.timeout_seconds ?? 30));
-    // t_start 儲存 AEQTS 鄰域大小 N；t_end 儲存實際迭代次數
-    const N       = detail?.t_start ?? 50;
-    const numIter = detail?.t_end   ?? Math.max(1000, (detail?.n_variables ?? 0) * 100);
-    setParamInitTemp(externalSimParams?.initTemp ?? String(Math.round(N)));
-    setParamCoolingRate(externalSimParams?.coolingRate ?? String(Math.round(numIter)));
-    setSimHistory(detail?.history_data ?? []);
-    setIsRunning((detail?.status ?? '') === 'running');
-    setIsCompleted((detail?.status ?? '') === 'completed');
-  }, [jobId, detail, externalSimParams]);
-
-  // ── 正式環境由後端執行，不在前端啟動本地模擬 ─────────────────
-  const handleStart = useCallback(() => {}, []);
+  // ── 模擬狀態（由後端狀態推導）──────────────────────────────────
+  const simHistory: SimPoint[] = detail?.history_data ?? [];
+  const isRunning = (detail?.status ?? '') === 'running';
+  const isCompleted = (detail?.status ?? '') === 'completed';
 
   // ── 正式環境暫不在前端控制暫停 ───────────────────────────────
   const handlePause = useCallback(() => {}, []);
@@ -101,11 +82,11 @@ export function useQuboSimulation(
   })();
 
   return {
-    paramTimeout, setParamTimeout,
-    paramInitTemp, setParamInitTemp,
-    paramCoolingRate, setParamCoolingRate,
+    paramTimeout,
+    paramInitTemp,
+    paramCoolingRate,
     simHistory, isRunning, isCompleted,
-    handleStart, handlePause,
+    handlePause,
     iterCount,
     bestObjective, tts, feasiblePct,
   };

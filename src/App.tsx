@@ -9,12 +9,21 @@ import QuboSetupPage from './components/QuboSetupPage';
 import QuboMonitorPanel from './components/QuboMonitorPanel';
 import type { CreateJobPayload, SimParams, KnapsackSolveRequest, QuboFormData, KnapsackSolveResponse } from './types/job';
 import { DEFAULT_QUBO_FORM } from './types/job';
+import type { AppLanguage } from './types/i18n';
 
-type ViewMode = 'params' | 'qubo-setup' | 'solve-result' | 'dashboard';
+type ViewMode = 'params' | 'qubo-setup' | 'dashboard';
 
 const DEFAULT_SIM_PARAMS: SimParams = { timeout: '30', initTemp: '50', coolingRate: '1000' };
+const LANGUAGE_STORAGE_KEY = 'qubo-dashboard.lang';
+
+function getInitialLanguage(): AppLanguage {
+  const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return saved === 'en' ? 'en' : 'zh';
+}
 
 export default function OptimizationDashboard() {
+  // 全局語言狀態
+  const [lang, setLang] = useState<AppLanguage>(getInitialLanguage);
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('params');
@@ -25,17 +34,21 @@ export default function OptimizationDashboard() {
   const [quboFormData, setQuboFormData] = useState<QuboFormData>(DEFAULT_QUBO_FORM);
 
   const { jobList, isLoading: isListLoading, error: listError, refetch: refetchList } = useJobs();
-  const { detail: jobDetail, isLoading: isDetailLoading, error: detailError } = useJobDetail(activeId);
+  const activeStillExists =
+    activeId === null
+    || isListLoading
+    || jobList.length === 0
+    || jobList.some((j) => String(j.id) === String(activeId));
+  const effectiveActiveId = activeStillExists ? activeId : null;
+  const effectiveViewMode: ViewMode = activeStillExists ? viewMode : 'params';
+
+  const { detail: jobDetail, isLoading: isDetailLoading, error: detailError } = useJobDetail(effectiveActiveId);
   const { solve, isSubmitting, error: solveError, reset: resetSolveState } = useSolveKnapsack();
   const [lastSolveResult, setLastSolveResult] = useState<KnapsackSolveResponse | null>(null);
 
-  // 任務已從列表消失時返回首頁
   useEffect(() => {
-    if (!isListLoading && jobList.length > 0 && activeId !== null) {
-      const stillExists = jobList.some((j) => String(j.id) === String(activeId));
-      if (!stillExists) { setActiveId(null); setViewMode('params'); }
-    }
-  }, [jobList, isListLoading, activeId]);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  }, [lang]);
 
   // ── Page 1 → Page 2 ─────────────────────────────────────────────
   const [pendingPayload, setPendingPayload] = useState<CreateJobPayload | null>(null);
@@ -172,9 +185,17 @@ export default function OptimizationDashboard() {
   };
 
   // ── 步驟指示器 ───────────────────────────────────────────────────
-  const STEPS = ['參數設定', 'QUBO 設定', '求解監控'];
-  const stepIndex = viewMode === 'params' ? 0 : viewMode === 'qubo-setup' ? 1 : 2;
-  const showStepper = viewMode !== 'dashboard';
+  const i18n = {
+    zh: {
+      steps: ['參數設定', 'QUBO 設定', '求解監控'],
+    },
+    en: {
+      steps: ['Parameter', 'QUBO Setup', 'Monitor'],
+    }
+  };
+  const t = i18n[lang];
+  const stepIndex = effectiveViewMode === 'params' ? 0 : effectiveViewMode === 'qubo-setup' ? 1 : 2;
+  const showStepper = effectiveViewMode !== 'dashboard';
 
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 font-sans overflow-hidden">
@@ -184,10 +205,12 @@ export default function OptimizationDashboard() {
         jobList={jobList}
         isLoading={isListLoading}
         error={listError}
-        activeId={activeId}
+        activeId={effectiveActiveId}
         onSelectJob={handleSelectJob}
         onDeleteJob={handleDeleteJob}
         onCreateNew={handleOpenCreate}
+        lang={lang}
+        setLang={setLang}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -195,8 +218,8 @@ export default function OptimizationDashboard() {
         {showStepper && (
           <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm">
             <span className="text-sm font-medium text-gray-400 tracking-tight">QUBO Dashboard</span>
-            <div className="ml-auto flex items-center gap-1">
-              {STEPS.map((label, i) => (
+            <div className="ml-auto flex items-center gap-2">
+              {t.steps.map((label, i) => (
                 <div key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-gray-700 text-[10px]">›</span>}
                   <span
@@ -218,16 +241,17 @@ export default function OptimizationDashboard() {
 
         {/* ── 主內容 ─────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          {viewMode === 'params' && (
+          {effectiveViewMode === 'params' && (
             <ParamsPage
               onNext={handleParamsNext}
               defaultSimParams={simParams}
               defaultPayload={reusePayload ?? undefined}
               restorePayload={pendingPayload ?? undefined}
+              lang={lang}
             />
           )}
 
-          {viewMode === 'qubo-setup' && (
+          {effectiveViewMode === 'qubo-setup' && (
             <QuboSetupPage
               problemType={pendingPayload?.problem_type ?? 'knapsack'}
               problemData={pendingPayload?.problem_data}
@@ -237,20 +261,22 @@ export default function OptimizationDashboard() {
               onSubmit={handleQuboSubmit}
               initialFormData={quboFormData}
               onFormChange={setQuboFormData}
+              lang={lang}
             />
           )}
 
-          {viewMode === 'dashboard' && (
+          {effectiveViewMode === 'dashboard' && (
             <QuboMonitorPanel
-              jobId={activeId}
+              jobId={effectiveActiveId}
               detail={jobDetail}
               isLoading={isDetailLoading}
               loadError={detailError}
               simParams={simParams}
               isSolving={isSubmitting}
               solveResult={lastSolveResult}
-              onStop={() => activeId !== null ? handleStopJob(activeId) : setViewMode('qubo-setup')}
+              onStop={() => effectiveActiveId !== null ? handleStopJob(effectiveActiveId) : setViewMode('qubo-setup')}
               onReuseSettings={handleReuseSettings}
+              lang={lang}
             />
           )}
         </main>

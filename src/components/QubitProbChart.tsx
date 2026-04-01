@@ -1,18 +1,19 @@
-// src/components/QubitProbChart.tsx — Q-bit 機率變化圖 (Subplot 網格版)
+// src/components/QubitProbChart.tsx — Q-bit 機率變化圖 (支援雙語)
 import ReactECharts from 'echarts-for-react';
 import type { HistoryDataPoint } from '../types/job';
 
 interface Props {
   history: HistoryDataPoint[];
+  lang?: 'zh' | 'en'; // 💡 接收語言屬性
 }
 
-export default function QubitProbChart({ history }: Props) {
-  const data = history.filter((d) => d.qubit_probs && d.qubit_probs.length > 0);
+export default function QubitProbChart({ history, lang = 'zh' }: Props) {
+  const data = history.filter((d) => Array.isArray(d.qubit_probs) && d.qubit_probs.length > 0);
   
   if (data.length === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-        目前無 Q-bit 機率資料
+        {lang === 'zh' ? '目前無 Q-bit 機率資料' : 'No Q-bit probability data available'}
       </div>
     );
   }
@@ -30,11 +31,10 @@ export default function QubitProbChart({ history }: Props) {
           const option = {
             animation: false,
             tooltip: { show: false },
-            // 💡 微調網格的留白，避免切字
             grid: { top: 15, right: 10, bottom: 25, left: 35 }, 
             xAxis: {
               type: 'value',
-              name: 'Iter', // 💡 縮短字數
+              name: 'Iter',
               nameLocation: 'middle',
               nameGap: 12,
               nameTextStyle: { color: '#9ca3af', fontSize: 10, fontWeight: 'bold' },
@@ -45,7 +45,7 @@ export default function QubitProbChart({ history }: Props) {
             },
             yAxis: {
               type: 'value',
-              name: `Q[${i}]`, // 💡 從 [i] probability 縮短成 Q[i]，超級省空間
+              name: `Q[${i}]`,
               nameLocation: 'middle',
               nameGap: 22,
               nameTextStyle: { color: '#9ca3af', fontSize: 10, fontWeight: 'bold' },
@@ -65,7 +65,6 @@ export default function QubitProbChart({ history }: Props) {
           };
 
           return (
-            // 💡 加高到 h-48，多一點呼吸空間
             <div key={i} className="bg-gray-800/80 border border-gray-700/60 rounded-lg p-1 h-48 shadow-sm hover:border-gray-500 transition-colors">
               <ReactECharts
                 option={option}

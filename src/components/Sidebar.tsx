@@ -2,7 +2,9 @@
 import { Menu, SquarePen } from 'lucide-react';
 import JobListItem from './JobListItem';
 import StatusBadge from './StatusBadge';
+import LanguageToggle from './LanguageToggle';
 import type { JobItem } from '../types/job';
+import type { AppLanguage } from '../types/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -14,6 +16,8 @@ interface Props {
   onSelectJob: (id: string | number) => void;
   onDeleteJob: (id: string | number) => void;
   onCreateNew: () => void;
+  lang: AppLanguage;
+  setLang: (lang: AppLanguage) => void;
 }
 
 export default function Sidebar({
@@ -26,6 +30,8 @@ export default function Sidebar({
   onSelectJob,
   onDeleteJob,
   onCreateNew,
+  lang,
+  setLang,
 }: Props) {
   return (
     <aside
@@ -42,7 +48,7 @@ export default function Sidebar({
           onClick={onToggle}
           className="w-10 h-10 flex items-center justify-center rounded-full
                      text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex-shrink-0"
-          aria-label={isOpen ? '收合側邊欄' : '展開側邊欄'}
+          aria-label={isOpen ? (lang === 'zh' ? '收合側邊欄' : 'Collapse sidebar') : (lang === 'zh' ? '展開側邊欄' : 'Expand sidebar')}
         >
           <Menu size={20} />
         </button>
@@ -57,7 +63,7 @@ export default function Sidebar({
       <div className={`flex items-center h-12 mb-2 flex-shrink-0 ${isOpen ? 'px-3' : 'justify-center'}`}>
         <button
           onClick={onCreateNew}
-          title="新任務"
+          title={lang === 'zh' ? '新任務' : 'New Task'}
           className="w-10 h-10 flex items-center justify-center rounded-full
                      text-gray-300 hover:text-white hover:bg-gray-800 transition-colors flex-shrink-0"
         >
@@ -65,7 +71,7 @@ export default function Sidebar({
         </button>
         {isOpen && (
           <span className="ml-3 text-sm text-gray-200 whitespace-nowrap select-none">
-            新任務
+            {lang === 'zh' ? '新任務' : 'New Task'}
           </span>
         )}
       </div>
@@ -76,7 +82,7 @@ export default function Sidebar({
       {/* ── 歷史標題（展開時） ── */}
       {isOpen && (
         <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-widest text-gray-300">
-          歷史紀錄
+          {lang === 'zh' ? '歷史紀錄' : 'History'}
         </p>
       )}
 
@@ -90,7 +96,7 @@ export default function Sidebar({
           <p className="text-center text-rose-400/80 text-xs py-6 px-2">{error}</p>
         ) : jobList.length === 0 ? (
           isOpen ? (
-            <p className="text-center text-gray-400 text-xs py-6">尚無任務</p>
+            <p className="text-center text-gray-400 text-xs py-6">{lang === 'zh' ? '尚無任務' : 'No tasks yet'}</p>
           ) : null
         ) : isOpen ? (
           <div className="px-2 space-y-0.5">
@@ -122,6 +128,15 @@ export default function Sidebar({
             ))}
           </div>
         )}
+      </div>
+      {/* ── 左下角語言切換按鈕 ── */}
+      <div className="mt-auto mb-4 flex justify-center">
+        <LanguageToggle
+          lang={lang}
+          setLang={setLang}
+          title={lang === 'zh' ? '切換英文' : 'Switch to Chinese'}
+          className="px-3 py-1 rounded bg-gray-700/40 hover:bg-gray-700/80 text-gray-300 hover:text-white text-xs font-medium border border-gray-600/50 transition-colors"
+        />
       </div>
     </aside>
   );

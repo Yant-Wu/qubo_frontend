@@ -1,25 +1,38 @@
-// src/components/EnergyConvergenceChart.tsx — 能量收斂折線圖
+// src/components/EnergyConvergenceChart.tsx — 能量收斂折線圖 (支援雙語)
 import ReactECharts from 'echarts-for-react';
 import type { HistoryDataPoint } from '../types/job';
 
 interface Props {
   history: HistoryDataPoint[];
   compact?: boolean;
+  lang?: 'zh' | 'en'; // 💡 接收語言屬性
 }
 
-export default function EnergyConvergenceChart({ history, compact = false }: Props) {
+export default function EnergyConvergenceChart({ history, compact = false, lang = 'zh' }: Props) {
   if (history.length === 0) return null;
 
   const hasQE = history.some((d) => d.qubo_energy != null);
+
+  // 💡 根據語言設定 Tooltip 文字
+  const tooltipText = {
+    zh: {
+      bestDesc: '歷史最佳解的總價值<br/>只增不減，最右端即為最終答案',
+      quboDesc: '含懲罰項的能量值，用來導引搜索方向<br/>數值越負代表解越好且越可行'
+    },
+    en: {
+      bestDesc: 'Total value of the best historical solution<br/>Only increases, rightmost is the final answer',
+      quboDesc: 'Energy value with penalty, guides search direction<br/>More negative means a better and feasible solution'
+    }
+  };
 
   const option = {
     backgroundColor: 'transparent',
     grid: compact
       ? { top: 6, right: 6, bottom: 6, left: 6 }
-      : { top: 45, right: hasQE ? 70 : 20, bottom: 40, left: 65 }, // 💡 增加邊距避免字體重疊
+      : { top: 45, right: hasQE ? 70 : 20, bottom: 40, left: 65 },
     legend: compact ? undefined : hasQE ? {
       top: 0,
-      right: hasQE ? 70 : 20, // 💡 圖例往右推
+      right: hasQE ? 70 : 20,
       textStyle: { color: '#e5e7eb', fontSize: 13 },
       itemWidth: 16,
       itemHeight: 10,
@@ -29,10 +42,8 @@ export default function EnergyConvergenceChart({ history, compact = false }: Pro
         borderColor: '#374151',
         textStyle: { color: '#e5e7eb', fontSize: 13 },
         formatter: (params: { name: string }) => {
-          if (params.name === 'Best Objective')
-            return '歷史最佳解的總價值<br/>只增不減，最右端即為最終答案';
-          if (params.name === 'QUBO Energy')
-            return '含懲罰項的能量值，用來導引搜索方向<br/>數值越負代表解越好且越可行';
+          if (params.name === 'Best Objective') return tooltipText[lang].bestDesc;
+          if (params.name === 'QUBO Energy') return tooltipText[lang].quboDesc;
           return params.name;
         },
       },

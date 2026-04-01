@@ -1,8 +1,9 @@
-// src/components/QuboMonitorPanel.tsx — 監控儀錶板：歷史任務狀態跟蹤
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+// src/components/QuboMonitorPanel.tsx — 監控儀錶板：支援中英雙語切換
+import { useState, type ReactNode } from 'react';
 import { Download, Play } from 'lucide-react';
 import type { JobDetail, SimParams } from '../types/job';
 import type { KnapsackSolveResponse } from '../types/job';
+import type { AppLanguage } from '../types/i18n';
 import { useQuboSimulation } from '../hooks/useQuboSimulation';
 import EnergyConvergenceChart from './EnergyConvergenceChart';
 import EntropyChart from './EntropyChart';
@@ -18,28 +19,63 @@ interface Props {
   solveResult?: KnapsackSolveResponse | null;
   onStop: () => void;
   onReuseSettings?: () => void;
+  lang: AppLanguage;
 }
 
-// ── 閃爍數傀元件 ─────────────────────────────────────────────────
+// ── 語系字典 ──────────────────────────────────────────────────────
+const i18n = {
+  zh: {
+    paramLog: '此次參數紀錄',
+    optResult: '最佳化結果',
+    runningMsg: '後端運算中…',
+    completeMsg: '✓ 後端回傳完成',
+    rerunBtn: '↺ 套用此設定重新執行',
+    leaveBtn: '← 離開並刪除任務',
+    exportBtn: '匯出 01 字串',
+    waitData: '等待資料',
+    fetching: '正在取得任務資料…',
+    waitBackend: '後端尚未開始運算，請稍候。',
+    tabMain: '綜合視圖 (Convergence & Q-bits)',
+    tabEntropy: '系統平均熵 (Entropy)',
+    chartTop: '最佳價值與能量收斂',
+    chartBottom: 'Q-bit 量子態坍縮機率',
+    loadTask: '載入任務資料中…',
+    errLoad: '無法載入任務',
+    backHome: '← 返回首頁',
+    itemsCount: 'Selected Items',
+    solving: 'AEQTS 正在求解，請稍候',
+  },
+  en: {
+    paramLog: 'Execution Parameters',
+    optResult: 'Optimization Results',
+    runningMsg: 'Backend computing...',
+    completeMsg: '✓ Backend response completed',
+    rerunBtn: '↺ Rerun with these settings',
+    leaveBtn: '← Leave and delete task',
+    exportBtn: 'Export Bitstring',
+    waitData: 'Waiting for data',
+    fetching: 'Fetching task data...',
+    waitBackend: 'Backend calculation pending, please wait.',
+    tabMain: 'Main View (Convergence & Q-bits)',
+    tabEntropy: 'System Avg Entropy',
+    chartTop: 'Best Value & Energy Convergence',
+    chartBottom: 'Q-bit Collapse Probability',
+    loadTask: 'Loading task data...',
+    errLoad: 'Failed to load task',
+    backHome: '← Back to Home',
+    itemsCount: 'Selected Items',
+    solving: 'AEQTS solving, please wait...',
+  },
+};
+
+// ── 閃爍數據元件 ─────────────────────────────────────────────────
 function FlickerValue({ value, large = false, xl = false }: { value: string; large?: boolean; xl?: boolean }) {
-  const [flash, setFlash] = useState(false);
-  const prev = useRef(value);
-  useEffect(() => {
-    if (value !== prev.current) {
-      prev.current = value;
-      if (value !== '—') {
-        setFlash(true);
-        const t = setTimeout(() => setFlash(false), 350);
-        return () => clearTimeout(t);
-      }
-    }
-  }, [value]);
   return (
     <span
       className={[
         'font-mono transition-all duration-150 leading-none',
         xl ? 'text-5xl font-black' : large ? 'text-3xl font-bold' : 'text-base font-semibold',
-        flash ? 'text-white drop-shadow-[0_0_8px_rgba(110,231,183,0.9)]' : xl ? 'text-emerald-300 drop-shadow-[0_0_4px_rgba(52,211,153,0.4)]' : 'text-emerald-300',
+        xl ? 'text-emerald-300 drop-shadow-[0_0_4px_rgba(52,211,153,0.4)]' : 'text-emerald-300',
       ].join(' ')}
     >
       {value}
@@ -48,7 +84,9 @@ function FlickerValue({ value, large = false, xl = false }: { value: string; lar
 }
 
 // ── 主元件 ──────────────────────────────────────────────────────────
-export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, isSolving = false, solveResult, onStop, onReuseSettings }: Props) {
+export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loadError, simParams, isSolving = false, solveResult, onStop, onReuseSettings, lang }: Props) {
+  const t = i18n[lang];
+
   const {
     paramTimeout, paramInitTemp, paramCoolingRate,
     simHistory,
@@ -67,10 +105,8 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
   const displayTotalWeight = pd?.total_weight ?? solveResult?.total_weight;
   const displayTimeMs = solveResult?.computation_time_ms || detail?.computation_time_ms;
 
-  // 狀態簡化為「綜合視圖」與「亂度下降」
   const [chartMode, setChartMode] = useState<'main' | 'entropy'>('main');
 
-  // 匯出 01 字串
   const handleExport = () => {
     const originalItems = (detail?.problem_data?.items as Array<{ name: string }> | undefined) ?? [];
     const selectedNames = new Set(displaySelected.map((i) => i.name));
@@ -91,7 +127,7 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
       <div className="flex-1 flex items-center justify-center bg-gray-950">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" />
-          <p className="text-gray-100 text-sm">載入任務資料中…</p>
+          <p className="text-gray-100 text-sm">{t.loadTask}</p>
         </div>
       </div>
     );
@@ -101,9 +137,9 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-950">
         <div className="text-center space-y-3 max-w-sm px-6">
-          <p className="text-rose-400 text-sm font-semibold">無法載入任務</p>
+          <p className="text-rose-400 text-sm font-semibold">{t.errLoad}</p>
           <p className="text-gray-300 text-xs">{loadError}</p>
-          <button onClick={onStop} className="mt-2 text-xs text-gray-500 hover:text-gray-300 underline transition-colors">← 返回首頁</button>
+          <button onClick={onStop} className="mt-2 text-xs text-gray-500 hover:text-gray-300 underline transition-colors">{t.backHome}</button>
         </div>
       </div>
     );
@@ -118,12 +154,12 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 flex overflow-hidden">
 
-        {/* ── 左側面板 ─────────────────────────────────────────────── */}
         <aside className="w-72 flex-shrink-0 flex flex-col gap-3 p-4 border-r border-gray-800/60 bg-gray-900/40 overflow-y-auto">
 
-          {/* 求解參數 */}
+
+
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-1.5">
-            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider mb-2">此次參數紀錄</p>
+            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider mb-2">{t.paramLog}</p>
             <ReadRow label="Task Name" value={detail?.task_name ?? '—'} />
             <ReadRow label="Problem Type" value={detail?.problem_type ?? '—'} />
             <ReadRow label="Generation" value={detail?.problem_type === 'custom' ? `custom (${detail?.n_variables ?? '?'}×${detail?.n_variables ?? '?'})` : (detail?.problem_data?.generation_method ?? '—')} />
@@ -158,9 +194,8 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             )}
           </div>
 
-          {/* 最佳化結果 */}
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-4">
-            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">最佳化結果</p>
+            <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider">{t.optResult}</p>
             <MetricBlock label="Best Objective"><FlickerValue value={bestObjective} xl /></MetricBlock>
             <MetricBlock label="TTS"><FlickerValue value={tts} large /></MetricBlock>
             <MetricBlock label="Feasible Solutions"><FlickerValue value={feasiblePct !== '—' ? `${feasiblePct} %` : '—'} large /></MetricBlock>
@@ -173,10 +208,9 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             )}
           </div>
 
-          {/* 選中物品清單 */}
           {displaySelected.length > 0 && (
             <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-3 space-y-2 flex-1 min-h-0 flex flex-col">
-              <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider flex-shrink-0">Selected Items ({displaySelected.length})</p>
+              <p className="text-sm font-semibold text-gray-200 uppercase tracking-wider flex-shrink-0">{t.itemsCount} ({displaySelected.length})</p>
               <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1">
                 {displaySelected.map((item, i) => (
                   <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-gray-900/60 border border-gray-700/30 px-2.5 py-1.5">
@@ -189,31 +223,31 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             </div>
           )}
 
-          {statusLabel === 'running' && <div className="text-center text-xs text-emerald-300 font-medium py-1">後端運算中…</div>}
-          {statusLabel === 'completed' && <div className="text-center text-xs text-indigo-300 font-medium py-1">✓ 後端回傳完成</div>}
-          
+          {statusLabel === 'running' && <div className="text-center text-xs text-emerald-300 font-medium py-1">{t.runningMsg}</div>}
+          {statusLabel === 'completed' && <div className="text-center text-xs text-indigo-300 font-medium py-1">{t.completeMsg}</div>}
+
           {onReuseSettings && (
             <button onClick={onReuseSettings} className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors border border-indigo-700/40">
-              ↺ 套用此設定重新執行
+              {t.rerunBtn}
             </button>
           )}
           <button onClick={() => { handlePause(); onStop(); }} className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-gray-500 hover:text-rose-400 text-xs transition-colors">
-            ← 離開並刪除任務
+            {t.leaveBtn}
           </button>
         </aside>
 
-        {/* ── 右側：圖表區 ───────────────────────────────────────── */}
         <div className="flex-1 flex flex-col overflow-hidden p-4 gap-3">
-          
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-base font-semibold text-gray-200">Qubit Probability Monitor</span>
             {detail?.task_name && <span className="text-xs text-gray-300 truncate">— {detail.task_name}</span>}
+
             <span className={`ml-auto flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full ${statusColor}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />{statusLabel}
             </span>
+
             {statusLabel === 'completed' && (
               <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 hover:text-emerald-100 text-sm font-medium transition-colors border border-emerald-700/40">
-                <Download size={14} />匯出 01 字串
+                <Download size={14} />{t.exportBtn}
               </button>
             )}
           </div>
@@ -222,58 +256,52 @@ export default function QuboMonitorPanel({ jobId, detail, isLoading = false, loa
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-4">
                 {isSolving ? (
-                  <><div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" /><div><p className="text-gray-300 text-sm font-medium">後端運算中…</p><p className="text-gray-600 text-xs mt-1">AEQTS 正在求解，請稍候</p></div></>
+                  <><div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin mx-auto" /><div><p className="text-gray-300 text-sm font-medium">{t.runningMsg}</p><p className="text-gray-600 text-xs mt-1">{t.solving}</p></div></>
                 ) : (
-                  <><div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto"><Play size={28} className="text-indigo-400 ml-1" /></div><div><p className="text-gray-300 text-sm font-medium">等待資料</p><p className="text-gray-600 text-xs mt-1">{detail === null ? '正在取得任務資料…' : '後端尚未開始運算，請稍候。'}</p></div></>
+                  <><div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/50 flex items-center justify-center mx-auto"><Play size={28} className="text-indigo-400 ml-1" /></div><div><p className="text-gray-300 text-sm font-medium">{t.waitData}</p><p className="text-gray-600 text-xs mt-1">{detail === null ? t.fetching : t.waitBackend}</p></div></>
                 )}
               </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col bg-gray-800/30 border border-gray-700/40 rounded-xl overflow-hidden min-h-0">
-              
-              {/* 💡 按鈕區塊 */}
               <div className="flex items-center gap-2 p-3 border-b border-gray-700/50 bg-gray-900/50 flex-shrink-0">
                 <button
                   onClick={() => setChartMode('main')}
                   className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${chartMode === 'main' ? 'bg-indigo-600 text-white shadow' : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}`}
                 >
-                  綜合視圖 (Convergence & Q-bits)
+                  {t.tabMain}
                 </button>
                 <button
                   onClick={() => setChartMode('entropy')}
                   className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${chartMode === 'entropy' ? 'bg-indigo-600 text-white shadow' : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}`}
                 >
-                  系統平均熵 (Entropy)
+                  {t.tabEntropy}
                 </button>
               </div>
 
-              {/* 💡 Flex 動態排版圖表渲染區 */}
               <div className="flex-1 overflow-hidden relative">
                 {chartMode === 'main' && (
                   <div className="absolute inset-0 flex flex-col">
-                    {/* 上半部：收斂曲線 (佔 45%) */}
                     <div className="flex-[45] flex flex-col min-h-0 border-b border-gray-700/50 pt-2">
                       <div className="px-4 pb-1 text-xs font-semibold text-gray-400 tracking-wider flex-shrink-0">
-                        最佳價值與能量收斂
+                        {t.chartTop}
                       </div>
                       <div className="flex-1 min-h-0">
-                        <EnergyConvergenceChart history={simHistory} />
+                        <EnergyConvergenceChart history={simHistory} lang={lang} />
                       </div>
                     </div>
-                    {/* 下半部：Q-bit 機率網格 (佔 55%) */}
                     <div className="flex-[55] flex flex-col min-h-0 bg-gray-900/20 pt-2">
                       <div className="px-4 pb-1 text-xs font-semibold text-gray-400 tracking-wider flex-shrink-0">
-                        Q-bit 量子態坍縮機率
+                        {t.chartBottom}
                       </div>
                       <div className="flex-1 min-h-0">
-                        <QubitProbChart history={simHistory} />
+                        <QubitProbChart history={simHistory} lang={lang} />
                       </div>
                     </div>
                   </div>
                 )}
                 {chartMode === 'entropy' && <EntropyChart history={simHistory} />}
               </div>
-
             </div>
           )}
         </div>
